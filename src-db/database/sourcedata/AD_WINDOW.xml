@@ -1,0 +1,25 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<data>
+<!--34C69B733AB24D39AC65DE1D7ECFA776--><AD_WINDOW>
+<!--34C69B733AB24D39AC65DE1D7ECFA776-->  <AD_WINDOW_ID><![CDATA[34C69B733AB24D39AC65DE1D7ECFA776]]></AD_WINDOW_ID>
+<!--34C69B733AB24D39AC65DE1D7ECFA776-->  <AD_CLIENT_ID><![CDATA[0]]></AD_CLIENT_ID>
+<!--34C69B733AB24D39AC65DE1D7ECFA776-->  <AD_ORG_ID><![CDATA[0]]></AD_ORG_ID>
+<!--34C69B733AB24D39AC65DE1D7ECFA776-->  <ISACTIVE><![CDATA[Y]]></ISACTIVE>
+<!--34C69B733AB24D39AC65DE1D7ECFA776-->  <NAME><![CDATA[Provider Implementation]]></NAME>
+<!--34C69B733AB24D39AC65DE1D7ECFA776-->  <DESCRIPTION><![CDATA[Links each Print Provider to the Java class that implements its printing logic.]]></DESCRIPTION>
+<!--34C69B733AB24D39AC65DE1D7ECFA776-->  <HELP><![CDATA[This window is restricted to System Administrator roles.
+For every provider configured in Print Providers, register:
+	1.	Module – the Etendo module that contains the connector code.
+	2.	Java Implementation – fully-qualified class that implements PrintProviderStrategy.
+
+If no implementation is found, printing will fail with “Provider implementation not defined”. Adding a new middleware requires only installing its connector module and creating a line here—no code changes in functional modules.]]></HELP>
+<!--34C69B733AB24D39AC65DE1D7ECFA776-->  <WINDOWTYPE><![CDATA[M]]></WINDOWTYPE>
+<!--34C69B733AB24D39AC65DE1D7ECFA776-->  <ISSOTRX><![CDATA[Y]]></ISSOTRX>
+<!--34C69B733AB24D39AC65DE1D7ECFA776-->  <PROCESSING><![CDATA[N]]></PROCESSING>
+<!--34C69B733AB24D39AC65DE1D7ECFA776-->  <ISDEFAULT><![CDATA[N]]></ISDEFAULT>
+<!--34C69B733AB24D39AC65DE1D7ECFA776-->  <AD_MODULE_ID><![CDATA[24A53DC5EB4C4F29A5412229D1F1671C]]></AD_MODULE_ID>
+<!--34C69B733AB24D39AC65DE1D7ECFA776-->  <ISTHREADSAFE><![CDATA[N]]></ISTHREADSAFE>
+<!--34C69B733AB24D39AC65DE1D7ECFA776-->  <ISADVANCEDFEATURE><![CDATA[N]]></ISADVANCEDFEATURE>
+<!--34C69B733AB24D39AC65DE1D7ECFA776--></AD_WINDOW>
+
+</data>
