@@ -70,6 +70,12 @@ Include any required path, port or query-string; do not append API-key parameter
 <!--81491BB0F2AA4E5B9F2B9E85C09978AA-->  <COLUMNNAME><![CDATA[Provider]]></COLUMNNAME>
 <!--81491BB0F2AA4E5B9F2B9E85C09978AA-->  <NAME><![CDATA[Provider]]></NAME>
 <!--81491BB0F2AA4E5B9F2B9E85C09978AA-->  <PRINTNAME><![CDATA[Provider]]></PRINTNAME>
+<!--81491BB0F2AA4E5B9F2B9E85C09978AA-->  <DESCRIPTION><![CDATA[Print provider responsible for updating printers.]]></DESCRIPTION>
+<!--81491BB0F2AA4E5B9F2B9E85C09978AA-->  <HELP><![CDATA[Provider configuration that should handle the refresh printers action.
+The chosen record determines:
+-Which credentials and URLs are used.
+-Which implementation class is loaded (via the Providers Implementation).
+-Which providers will have their printers updated.]]></HELP>
 <!--81491BB0F2AA4E5B9F2B9E85C09978AA-->  <AD_MODULE_ID><![CDATA[24A53DC5EB4C4F29A5412229D1F1671C]]></AD_MODULE_ID>
 <!--81491BB0F2AA4E5B9F2B9E85C09978AA-->  <ISGLOSSARY><![CDATA[N]]></ISGLOSSARY>
 <!--81491BB0F2AA4E5B9F2B9E85C09978AA--></AD_ELEMENT>
