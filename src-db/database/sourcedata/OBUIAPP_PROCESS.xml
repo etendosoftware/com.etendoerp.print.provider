@@ -13,7 +13,7 @@
 	2.	Load the mapped Provider Implementation (System Admin sets this in Providers Implementation).
 	3.	Fetch the current fleet of printers and upsert rows in the Printers grid.]]></HELP>
 <!--ED463E7DABB643D181CA3799C55FF008-->  <ACCESSLEVEL><![CDATA[3]]></ACCESSLEVEL>
-<!--ED463E7DABB643D181CA3799C55FF008-->  <CLASSNAME><![CDATA[com.etendoerp.print.provider.actionHandler.UpdatePrinters]]></CLASSNAME>
+<!--ED463E7DABB643D181CA3799C55FF008-->  <CLASSNAME><![CDATA[com.etendoerp.print.provider.action.UpdatePrinters]]></CLASSNAME>
 <!--ED463E7DABB643D181CA3799C55FF008-->  <ISBACKGROUND><![CDATA[N]]></ISBACKGROUND>
 <!--ED463E7DABB643D181CA3799C55FF008-->  <AD_MODULE_ID><![CDATA[24A53DC5EB4C4F29A5412229D1F1671C]]></AD_MODULE_ID>
 <!--ED463E7DABB643D181CA3799C55FF008-->  <UIPATTERN><![CDATA[A]]></UIPATTERN>

@@ -1,4 +1,4 @@
-package com.etendoerp.print.provider.actionHandler;
+package com.etendoerp.print.provider.action;
 
 import org.apache.commons.lang3.mutable.MutableBoolean;
 import org.codehaus.jettison.json.JSONObject;
@@ -54,9 +54,6 @@ public class UpdatePrinters extends Action {
     try {
       // NOTE: Intentionally left as a no-op. Do not add logic here until the
       // future implementation is defined and approved.
-      //
-      // TODO (future): honor isStopped flag, validate parameters, perform updates,
-      // and set a meaningful actionResult message summarizing the outcome.
       return actionResult;
 
     } catch (Exception e) {
