@@ -82,10 +82,11 @@ public class SendGeneratedLabelToPrinter extends Action {
       OBContext.setAdminMode(true);
       checkMandatoryParameters(parameters);
 
-      final String providerIdParam = parameters.optString(PrinterUtils.PROVIDER, null);
-      final String entityName = parameters.optString(PrinterUtils.ENTITY_NAME, null);
+      final String providerIdParam = parameters.getString(PrinterUtils.PROVIDER);
+      final String entityName = parameters.getString(PrinterUtils.ENTITY_NAME);
       final JSONArray records = parameters.getJSONArray(PrinterUtils.RECORDS);
-      final String printerId = parameters.optString(PrinterUtils.PRINTERS, null);
+      final String printerId = parameters.getString(PrinterUtils.PRINTERS);
+      //Handling multiple records is pending development.
       final String recordId = records.getString(0);
 
       Provider provider = OBDal.getInstance().get(Provider.class, providerIdParam);

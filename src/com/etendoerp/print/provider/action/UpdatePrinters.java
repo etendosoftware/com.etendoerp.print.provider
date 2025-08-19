@@ -19,11 +19,11 @@ import org.openbravo.erpCommon.utility.OBMessageUtils;
 
 import com.etendoerp.print.provider.api.PrintProviderException;
 import com.etendoerp.print.provider.api.PrinterDTO;
-import com.etendoerp.print.provider.utils.ProviderStrategyResolver;
 import com.etendoerp.print.provider.data.Printer;
 import com.etendoerp.print.provider.data.Provider;
 import com.etendoerp.print.provider.strategy.PrintProviderStrategy;
 import com.etendoerp.print.provider.utils.PrinterUtils;
+import com.etendoerp.print.provider.utils.ProviderStrategyResolver;
 import com.smf.jobs.Action;
 import com.smf.jobs.ActionResult;
 import com.smf.jobs.Result;
@@ -238,10 +238,23 @@ public class UpdatePrinters extends Action {
    * Immutable container for the result of the {@code UpdatePrinters} action.
    */
   private static final class UpsertCounters {
+    // Number of printers created
     public final int created;
+    // Number of printers updated
     public final int updated;
+    // Number of printers inactivated
     public final int inactivated;
 
+    /**
+     * Constructor.
+     *
+     * @param created
+     *     the number of created printers
+     * @param updated
+     *     the number of updated printers
+     * @param inactivated
+     *     the number of inactivated printers
+     */
     UpsertCounters(int created, int updated, int inactivated) {
       this.created = created;
       this.updated = updated;
@@ -254,6 +267,7 @@ public class UpdatePrinters extends Action {
    * <p>
    * This action does not use any specific input class, so it falls back to the
    * base class of all Openbravo objects: {@code BaseOBObject}.
+   *
    * @return the input class of the action
    */
   @Override

@@ -72,11 +72,11 @@ public interface PrintProviderStrategy {
    * “list printers” endpoint or mechanism.</p>
    *
    * @param provider
-   *   DAL entity with configuration (API key, endpoints, org/client).
+   *     DAL entity with configuration (API key, endpoints, org/client).
    * @return immutable list of printers (never {@code null}); may be empty if none are available.
    * @throws PrintProviderException
-   *   if authentication fails, the endpoint is unreachable, the response cannot be parsed,
-   *   or the provider rejects the request.
+   *     if authentication fails, the endpoint is unreachable, the response cannot be parsed,
+   *     or the provider rejects the request.
    */
   List<PrinterDTO> fetchPrinters(Provider provider) throws PrintProviderException;
 
@@ -87,18 +87,18 @@ public interface PrintProviderStrategy {
    * to produce a PDF/ZPL/PNG file. The returned file must exist and be readable.</p>
    *
    * @param provider
-   *   print provider configuration (may carry options influencing content type).
+   *     print provider configuration (may carry options influencing content type).
    * @param table
-   *   AD table of the record to print (e.g., {@code M_InOut}).
+   *     AD table of the record to print (e.g., {@code M_InOut}).
    * @param recordId
-   *   primary key of the record to print.
+   *     primary key of the record to print.
    * @param templateLineRef
-   *   selected {@code ETPP_TemplateLine} that contains the template location and flags.
+   *     selected {@code ETPP_TemplateLine} that contains the template location and flags.
    * @param parameters
-   *   raw process parameters (may include user-selected options like copies, language, etc.).
+   *     raw process parameters (may include user-selected options like copies, language, etc.).
    * @return a {@link File} pointing to the generated label (temporary file recommended).
    * @throws PrintProviderException
-   *   if the template cannot be loaded, rendering fails, or the output cannot be written.
+   *     if the template cannot be loaded, rendering fails, or the output cannot be written.
    */
   File generateLabel(Provider provider,
       Table table,
@@ -113,16 +113,16 @@ public interface PrintProviderStrategy {
    * and submit the job to the provider’s API or spooler using credentials from {@link Provider}.</p>
    *
    * @param provider
-   *   print provider configuration (endpoints, API key, org/client).
+   *     print provider configuration (endpoints, API key, org/client).
    * @param printer
-   *   DAL {@code ETPP_Printer} row indicating the destination device; its {@code value}
-   *   stores the provider’s external printer id.
+   *     DAL {@code ETPP_Printer} row indicating the destination device; its {@code value}
+   *     stores the provider’s external printer id.
    * @param labelFile
-   *   file previously created by {@link #generateLabel}; must exist and be readable.
+   *     file previously created by {@link #generateLabel}; must exist and be readable.
    * @return provider job id (stringified) if available; otherwise a non-empty fallback summary.
    * @throws PrintProviderException
-   *   if authentication fails, the destination printer is not accepted, the request is rejected,
-   *   there is a transport error, or the response cannot be interpreted.
+   *     if authentication fails, the destination printer is not accepted, the request is rejected,
+   *     there is a transport error, or the response cannot be interpreted.
    */
   String sendToPrinter(Provider provider,
       Printer printer,

@@ -1,9 +1,12 @@
 package com.etendoerp.print.provider.utils;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.openbravo.base.exception.OBException;
 import org.openbravo.base.util.OBClassLoader;
 import org.openbravo.erpCommon.utility.OBMessageUtils;
 
+import com.etendoerp.print.provider.api.PrintProviderException;
 import com.etendoerp.print.provider.data.Provider;
 import com.etendoerp.print.provider.data.ProvidersImplementation;
 import com.etendoerp.print.provider.strategy.PrintProviderStrategy;
@@ -54,6 +57,8 @@ import com.etendoerp.print.provider.strategy.PrintProviderStrategy;
  */
 public class ProviderStrategyResolver {
 
+  private static final Logger log = LogManager.getLogger(ProviderStrategyResolver.class);
+
   /**
    * Private constructor to prevent instantiation of the utility class.
    */
@@ -87,7 +92,8 @@ public class ProviderStrategyResolver {
       return (PrintProviderStrategy) clazz.getDeclaredConstructor().newInstance();
 
     } catch (Exception e) {
-      throw new OBException(e.getMessage());
+      log.error(e.getMessage());
+      throw new PrintProviderException("Error resolving PrintProviderStrategy", e);
     }
   }
 
