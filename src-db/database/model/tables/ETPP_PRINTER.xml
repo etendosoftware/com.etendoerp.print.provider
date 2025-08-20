@@ -65,7 +65,7 @@
       <index name="ETPP_PRINTER_PROVIDER_IDX" unique="false">
         <index-column name="ETPP_PROVIDER_ID"/>
       </index>
-      <check name="ETPP_ISDEFAULT_CHK"><![CDATA[ISDEFAULT IN ('Y', 'N')]]></check>
+      <check name="ETPP_PRINTER_DEFAULT_CHK"><![CDATA[ISDEFAULT IN ('Y', 'N')]]></check>
       <check name="ETPP_PRINTER_ISACTIVE_CHK"><![CDATA[ISACTIVE IN ('Y', 'N')]]></check>
     </table>
   </database>

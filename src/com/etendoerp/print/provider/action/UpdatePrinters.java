@@ -1,85 +1,277 @@
 package com.etendoerp.print.provider.action;
 
-import org.apache.commons.lang3.mutable.MutableBoolean;
-import org.codehaus.jettison.json.JSONObject;
-import org.openbravo.base.structure.BaseOBObject;
-import org.openbravo.dal.service.OBDal;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 
+import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.mutable.MutableBoolean;
+import org.codehaus.jettison.json.JSONException;
+import org.codehaus.jettison.json.JSONObject;
+import org.hibernate.criterion.Restrictions;
+import org.openbravo.base.exception.OBException;
+import org.openbravo.base.provider.OBProvider;
+import org.openbravo.base.structure.BaseOBObject;
+import org.openbravo.dal.core.OBContext;
+import org.openbravo.dal.service.OBCriteria;
+import org.openbravo.dal.service.OBDal;
+import org.openbravo.erpCommon.utility.OBMessageUtils;
+
+import com.etendoerp.print.provider.api.PrintProviderException;
+import com.etendoerp.print.provider.api.PrinterDTO;
+import com.etendoerp.print.provider.data.Printer;
+import com.etendoerp.print.provider.data.Provider;
+import com.etendoerp.print.provider.strategy.PrintProviderStrategy;
+import com.etendoerp.print.provider.utils.PrinterUtils;
+import com.etendoerp.print.provider.utils.ProviderStrategyResolver;
 import com.smf.jobs.Action;
 import com.smf.jobs.ActionResult;
 import com.smf.jobs.Result;
 
 /**
- * {@code UpdatePrinters}
+ * Synchronizes the local printer catalog ({@code ETPP_Printer}) with the devices exposed
+ * by a selected print provider.
  *
- * <p>SMF Job Action placeholder intended to update or refresh printer
- * configurations for a printing provider within Etendo ERP.</p>
+ * <p><strong>Purpose</strong><br>
+ * Keeps Etendo’s printer list aligned with the remote provider. It creates or updates
+ * printers returned by the provider and inactivates any local printers that are no longer
+ * present upstream.</p>
  *
- * <p><strong>Current behavior:</strong> No operation (no-op). The method simply
- * returns {@link Result.Type#SUCCESS} unless an exception occurs, in which case
- * it rolls back the DAL transaction and returns {@link Result.Type#ERROR}.</p>
+ * <p><strong>Expected parameters (popup JSON)</strong><br>
+ * Inside {@code _params}:
+ * <ul>
+ *   <li>{@code Provider} – UUID of {@code ETPP_Provider} to synchronize.</li>
+ * </ul>
+ * See {@link com.etendoerp.print.provider.utils.PrinterUtils#PARAMS} and
+ * {@link com.etendoerp.print.provider.utils.PrinterUtils#PROVIDER}.</p>
  *
- * <p><strong>Future behavior:</strong> This action will be fully implemented in
- * upcoming versions. Expect changes in input validation, database operations,
- * and the structure of the returned {@link ActionResult#getMessage()} to
- * summarize the work performed.</p>
- *
- * <p><strong>Input contract:</strong> To be defined. The {@code parameters}
- * object is currently not read. When implemented, this class is expected to
- * document required/optional fields and validation rules.</p>
- *
- * @see com.smf.jobs.Action
- * @since Pending
+ * @see com.etendoerp.print.provider.utils.PrinterUtils
+ * @see com.etendoerp.print.provider.utils.ProviderStrategyResolver
+ * @see com.etendoerp.print.provider.strategy.PrintProviderStrategy
+ * @see com.etendoerp.print.provider.data.Provider
+ * @see com.etendoerp.print.provider.data.Printer
  */
 public class UpdatePrinters extends Action {
 
   /**
-   * Entry point executed by the SMF Jobs engine.
+   * Job action to synchronize printers from a specific provider.
    *
-   * <p><strong>Current implementation:</strong> no-op. Does not read or
-   * validate {@code parameters}, does not modify DAL entities, and does not
-   * interact with external services. Returns SUCCESS by default.</p>
+   * <p>This action is meant to be scheduled periodically to keep the
+   * <code>ETPP_Printer</code> table up-to-date with the printers exposed by
+   * the configured printing provider.</p>
+   *
+   * <p>It fetches the list of printers from the provider, then upserts them
+   * into <code>ETPP_Printer</code> and inactivates those present in the DB
+   * but not returned by the provider.</p>
+   *
+   * <p>On success, the action logs a message with the number of created,
+   * updated and inactivated printers.</p>
+   *
+   * <h3>Parameters</h3>
+   * <ul>
+   *   <li>{@code {@link PrinterUtils#PROVIDER}} (UUID) of the print provider to
+   *       synchronize.</li>
+   * </ul>
    *
    * @param parameters
-   *     Runtime parameters (currently unused; contract TBD).
+   *     JSON object with the provider id
    * @param isStopped
-   *     Stop flag (if true, the runner may request early exit).
-   * @return An {@link ActionResult} indicating SUCCESS or ERROR.
+   *     flag to indicate if the job was stopped externally
+   * @return ActionResult indicating success or failure, with a message
    */
   @Override
   protected ActionResult action(JSONObject parameters, MutableBoolean isStopped) {
-    var actionResult = new ActionResult();
-    actionResult.setType(Result.Type.SUCCESS);
+    ActionResult result = new ActionResult();
 
     try {
-      // NOTE: Intentionally left as a no-op. Do not add logic here until the
-      // future implementation is defined and approved.
-      return actionResult;
+      OBContext.setAdminMode();
+      result.setType(Result.Type.SUCCESS);
+
+      checkMandatoryParameters(parameters);
+
+      // 1) Resolve provider id from params
+      JSONObject params = parameters.getJSONObject(PrinterUtils.PARAMS);
+      final String providerId = params.getString(PrinterUtils.PROVIDER);
+
+      // 2) Load provider & resolve strategy
+      final Provider provider = OBDal.getInstance().get(Provider.class, providerId);
+      if (provider == null) {
+        throw new OBException(OBMessageUtils.messageBD("ETPP_ProviderNotFound"));
+      }
+      final PrintProviderStrategy strategy = ProviderStrategyResolver.resolveForProvider(provider);
+
+      // 3) Fetch printers from provider
+      final List<PrinterDTO> list = strategy.fetchPrinters(provider);
+
+      // 4) Upsert into ETPP_PRINTER and inactivate missing ones
+      UpsertCounters counters = upsertPrinters(provider, list);
+
+      OBDal.getInstance().flush();
+
+      String msg = OBMessageUtils.messageBD("ETPP_PrintersUpdated") + " " +
+          "Created=" + counters.created + ", " +
+          "Updated=" + counters.updated + ", " +
+          "Inactivated=" + counters.inactivated;
+      result.setMessage(msg);
+
+      return result;
+
+    } catch (PrintProviderException e) {
+      OBDal.getInstance().rollbackAndClose();
+      result.setType(Result.Type.ERROR);
+      result.setMessage(String.format(
+          OBMessageUtils.messageBD("ETPP_ProviderErrorPrefix"), e.getMessage()));
+      return result;
 
     } catch (Exception e) {
-      // Ensures the DAL remains in a consistent state on unexpected errors.
       OBDal.getInstance().rollbackAndClose();
+      result.setType(Result.Type.ERROR);
+      result.setMessage(e.getMessage());
+      return result;
 
-      actionResult.setType(Result.Type.ERROR);
-      // NOTE: Currently propagating the raw exception message. In the real
-      // implementation, consider mapping to a user-friendly message and/or
-      // attaching a correlation ID for troubleshooting.
-      actionResult.setMessage(e.getMessage());
-      return actionResult;
+    } finally {
+      OBContext.restorePreviousMode();
     }
   }
 
   /**
-   * Declares the input entity type for this action.
+   * Verifies that the required parameters for this action are present in the input JSON object.
    *
-   * <p>Currently returns the generic {@link BaseOBObject} because this action
-   * does not consume a specific entity type. This may change in future
-   * versions if the job is tied to a concrete domain entity.</p>
+   * <p>The action requires the following parameters:</p>
+   * <ul>
+   *   <li>{@code Provider}: id of the print provider</li>
+   * </ul>
    *
-   * @return {@link BaseOBObject}. Subject to change in a future release.
+   * <p>If any of the required parameters are missing, an OBException is thrown.</p>
+   *
+   * @param parameters
+   *     JSON object containing the action input parameters
+   * @throws OBException
+   *     if any required parameter is missing
+   */
+  private void checkMandatoryParameters(JSONObject parameters) {
+    try {
+      JSONObject params = parameters.getJSONObject(PrinterUtils.PARAMS);
+      if (params == null) {
+        throw new OBException(String.format(
+            OBMessageUtils.messageBD("ETPP_MissingParameter"), PrinterUtils.PARAMS));
+      }
+      final String providerIdParam = params.getString(PrinterUtils.PROVIDER);
+
+      if (StringUtils.isBlank(providerIdParam)) {
+        throw new OBException(String.format(
+            OBMessageUtils.messageBD("ETPP_MissingParameter"), PrinterUtils.PROVIDER));
+      }
+    } catch (JSONException e) {
+      throw new OBException(e.getMessage());
+    }
+  }
+
+  /**
+   * Upserts printers returned by the print provider into the local database.
+   *
+   * <p>This method creates new records for printers not yet present in the local
+   * database and updates existing ones if the name or default status have changed.
+   * It also inactivates those printers that are no longer returned by the print
+   * provider.</p>
+   *
+   * @param provider
+   *     the print provider
+   * @param printers
+   *     the list of printers returned by the print provider
+   * @return an object containing the number of created, updated, and inactivated
+   *     printers
+   */
+  private static UpsertCounters upsertPrinters(Provider provider, List<PrinterDTO> printers) {
+
+    Set<String> seen = new HashSet<>();
+    int created = 0;
+    int updated = 0;
+    int inactivated = 0;
+
+    for (PrinterDTO dto : printers) {
+      seen.add(dto.getId());
+
+      // Find existing by (provider, value = externalId)
+      OBCriteria<Printer> criteria = OBDal.getInstance().createCriteria(Printer.class);
+      criteria.add(Restrictions.eq(Printer.PROPERTY_PROVIDER, provider));
+      criteria.add(Restrictions.eq(Printer.PROPERTY_VALUE, dto.getId()));
+      criteria.setMaxResults(1);
+      Printer existing = (Printer) criteria.uniqueResult();
+
+      if (existing == null) {
+        // Create
+        Printer p = OBProvider.getInstance().get(Printer.class);
+        p.setValue(dto.getId());
+        p.setName(dto.getName());
+        p.setDefault(dto.isDefault());
+        p.setProvider(provider);
+        OBDal.getInstance().save(p);
+        created++;
+      } else {
+        // Update
+        existing.setName(dto.getName());
+        existing.setDefault(dto.isDefault());
+        OBDal.getInstance().save(existing);
+        updated++;
+      }
+    }
+
+    // Inactivate those not returned by provider
+    OBCriteria<Printer> toInactivate = OBDal.getInstance().createCriteria(Printer.class);
+    toInactivate.add(Restrictions.eq(Printer.PROPERTY_PROVIDER, provider));
+    if (!seen.isEmpty()) {
+      toInactivate.add(Restrictions.not(Restrictions.in(Printer.PROPERTY_VALUE, seen)));
+    }
+    for (Printer printer : toInactivate.list()) {
+      if (printer.isActive()) {
+        printer.setActive(false);
+        OBDal.getInstance().save(printer);
+        inactivated++;
+      }
+    }
+
+    return new UpsertCounters(created, updated, inactivated);
+  }
+
+  /**
+   * Immutable container for the result of the {@code UpdatePrinters} action.
+   */
+  private static final class UpsertCounters {
+    // Number of printers created
+    public final int created;
+    // Number of printers updated
+    public final int updated;
+    // Number of printers inactivated
+    public final int inactivated;
+
+    /**
+     * Constructor.
+     *
+     * @param created
+     *     the number of created printers
+     * @param updated
+     *     the number of updated printers
+     * @param inactivated
+     *     the number of inactivated printers
+     */
+    UpsertCounters(int created, int updated, int inactivated) {
+      this.created = created;
+      this.updated = updated;
+      this.inactivated = inactivated;
+    }
+  }
+
+  /**
+   * The input class for the {@code UpdatePrinters} action.
+   * <p>
+   * This action does not use any specific input class, so it falls back to the
+   * base class of all Openbravo objects: {@code BaseOBObject}.
+   *
+   * @return the input class of the action
    */
   @Override
-  protected Class<BaseOBObject> getInputClass() {
+  protected Class<?> getInputClass() {
     return BaseOBObject.class;
   }
 }
