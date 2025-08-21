@@ -108,11 +108,8 @@ public class UpdatePrinters extends Action {
 
       OBDal.getInstance().flush();
 
-      String msg = OBMessageUtils.messageBD("ETPP_PrintersUpdated") + " " +
-          "Created=" + counters.created + ", " +
-          "Updated=" + counters.updated + ", " +
-          "Inactivated=" + counters.inactivated;
-      result.setMessage(msg);
+      result.setMessage(String.format(
+          OBMessageUtils.messageBD("ETPP_PrintersUpdated"), counters.created, counters.updated, counters.inactivated));
 
       return result;
 
