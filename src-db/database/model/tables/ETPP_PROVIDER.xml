@@ -45,11 +45,11 @@
         <default/>
         <onCreateDefault/>
       </column>
-      <column name="PRINTERS_GET_URL" primaryKey="false" required="true" type="VARCHAR" size="1000" autoIncrement="false">
+      <column name="PRINTERS_GET_URL" primaryKey="false" required="false" type="VARCHAR" size="1000" autoIncrement="false">
         <default/>
         <onCreateDefault/>
       </column>
-      <column name="PRINT_POST_URL" primaryKey="false" required="true" type="VARCHAR" size="1000" autoIncrement="false">
+      <column name="PRINT_POST_URL" primaryKey="false" required="false" type="VARCHAR" size="1000" autoIncrement="false">
         <default/>
         <onCreateDefault/>
       </column>
