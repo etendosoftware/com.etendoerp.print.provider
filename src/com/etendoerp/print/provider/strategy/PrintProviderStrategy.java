@@ -1,6 +1,7 @@
 package com.etendoerp.print.provider.strategy;
 
 import java.io.File;
+import java.util.Collections;
 import java.util.List;
 
 import org.codehaus.jettison.json.JSONObject;
@@ -13,118 +14,146 @@ import com.etendoerp.print.provider.data.Provider;
 import com.etendoerp.print.provider.data.TemplateLine;
 
 /**
- * Provider-agnostic contract that any printing connector must implement.
+ * Extension point (SPI) for print provider connectors.
  *
- * <p>The strategy encapsulates the interaction with a concrete print backend
- * (e.g., PrintNode, CUPS, vendor cloud). It is used by generic Actions such as:
+ * <p>Implementations of this class encapsulate all provider-specific logic
+ * (e.g., PrintNode, CUPS, cloud services, proprietary drivers) to:
  * <ul>
- *   <li><b>UpdatePrinters</b> → calls {@link #fetchPrinters(Provider)} to sync devices</li>
- *   <li><b>SendGeneratedLabelToPrinter</b> → calls
- *       {@link #generateLabel(Provider, Table, String, TemplateLine, JSONObject)} and
- *       {@link #sendToPrinter(Provider, Printer, File)}</li>
+ *   <li>Discover/retrieve available printers
+ *       ({@link #fetchPrinters(Provider)}).</li>
+ *   <li>Generate the label file (typically a PDF) from a Jasper template and an ERP record
+ *       ({@link #generateLabel(Provider, Table, String, TemplateLine, JSONObject)}).</li>
+ *   <li>Send the generated file to a concrete printer
+ *       ({@link #sendToPrinter(Provider, Printer, File)}).</li>
+ * </ul>
+ * </p>
+ *
+ * <h3>Contract</h3>
+ * <ul>
+ *   <li><em>Default methods</em>: this skeleton returns an empty list in
+ *       {@code fetchPrinters} and throws {@link UnsupportedOperationException} in
+ *       {@code generateLabel} and {@code sendToPrinter}. Subclasses are expected
+ *       to override them as needed.</li>
+ *   <li>Functional and integration errors with the provider should be reported as
+ *       {@link com.etendoerp.print.provider.api.PrintProviderException} so the
+ *       Etendo/Openbravo UI can handle them consistently.</li>
+ *   <li>Implementations should be <b>stateless</b> and <b>thread-safe</b> so they
+ *       can be reused by the process engine.</li>
  * </ul>
  *
- * <h3>General requirements</h3>
- * <ul>
- *   <li>Implementations must be stateless and thread-safe (no shared mutable state).</li>
- *   <li>Fail fast with meaningful {@link PrintProviderException} messages for
- *       configuration/auth/network issues.</li>
- *   <li>Honor organization and client scoping carried by the {@link Provider} DAL entity.</li>
- * </ul>
- *
- * <h3>Entity mapping conventions</h3>
- * <ul>
- *   <li>{@link PrinterDTO#id()} → stored in {@code ETPP_Printer.value} (external printer id).</li>
- *   <li>{@link PrinterDTO#name()} → stored in {@code ETPP_Printer.name}.</li>
- *   <li>{@link PrinterDTO#isDefault()} → stored in {@code ETPP_Printer.isDefault}.</li>
- * </ul>
- *
- * <h3>Label file lifecycle</h3>
- * <ul>
- *   <li>{@code generateLabel(...)} should return a file ready to be sent.</li>
- *   <li>Prefer creating a <i>temporary</i> file under {@code java.io.tmpdir}; callers
- *       may delete it after {@code sendToPrinter(...)} completes.</li>
- *   <li>If your backend supports Base64 payloads, you may still generate a file and
- *       encode its bytes in {@code sendToPrinter}.</li>
- * </ul>
- *
- * <h3>Error signaling</h3>
- * <ul>
- *   <li>Throw {@link PrintProviderException} for provider/API/transport/format errors.</li>
- *   <li>Do not throw unchecked exceptions unless it is truly unrecoverable.</li>
- * </ul>
- *
- * <h3>Minimal usage flow</h3>
+ * <h3>Typical usage</h3>
  * <pre>{@code
- * PrintProviderStrategy s = ... // resolved via ProviderStrategyResolver
- * List<PrinterDTO> printers = s.fetchPrinters(provider);
- * File label = s.generateLabel(provider, table, recordId, templateLine, params);
- * String jobId = s.sendToPrinter(provider, selectedPrinter, label);
+ * Provider provider = ...;  // connector config (URLs, API key, etc.)
+ * PrintProviderStrategy strategy = ProviderStrategyResolver.resolveForProvider(provider);
+ *
+ * // 1) List printers
+ * List<PrinterDTO> printers = strategy.fetchPrinters(provider);
+ *
+ * // 2) Generate a label for a specific record
+ * File pdf = strategy.generateLabel(provider, table, recordId, templateLine, params);
+ *
+ * // 3) Send to the selected printer
+ * String jobId = strategy.sendToPrinter(provider, printer, pdf);
  * }</pre>
+ *
+ * <h3>Implementation notes</h3>
+ * <ul>
+ *   <li>{@code generateLabel}: usually compiles/loads the Jasper template referenced by
+ *       {@link TemplateLine#getTemplateLocation()} and fills it with parameters
+ *       (e.g., {@code DOCUMENT_ID = recordId}).</li>
+ *   <li>{@code sendToPrinter}: converts the file (PDF/RAW) to the format required by the
+ *       provider and performs the HTTP/SDK call, returning a print job identifier when available.</li>
+ * </ul>
+ *
+ * @see com.etendoerp.print.provider.utils.ProviderStrategyResolver
+ * @see com.etendoerp.print.provider.api.PrintProviderException
+ * @see com.etendoerp.print.provider.api.PrinterDTO
+ * @see com.etendoerp.print.provider.data.Provider
+ * @see com.etendoerp.print.provider.data.Printer
+ * @see com.etendoerp.print.provider.data.TemplateLine
  */
-public interface PrintProviderStrategy {
+public abstract class PrintProviderStrategy {
 
   /**
-   * Retrieves the current list of printers from the provider for the given org/client context.
+   * Fetches the list of available printers from the configured PrintNode provider.
    *
-   * <p>The result is used to upsert {@code ETPP_Printer} rows. Implementations should
-   * authenticate using credentials found in {@link Provider} and call the provider’s
-   * “list printers” endpoint or mechanism.</p>
+   * <p>This method is a no-op by default, returning an empty list. It is expected
+   * that subclasses override this method to implement the printing provider's
+   * logic for fetching the available printers.</p>
    *
    * @param provider
-   *     DAL entity with configuration (API key, endpoints, org/client).
-   * @return immutable list of printers (never {@code null}); may be empty if none are available.
+   *     the provider configuration containing API endpoint and key.
+   * @return a list of {@link PrinterDTO} representing available printers.
    * @throws PrintProviderException
-   *     if authentication fails, the endpoint is unreachable, the response cannot be parsed,
-   *     or the provider rejects the request.
+   *     if provider configuration is invalid,
+   *     connection fails, or response cannot be parsed.
    */
-  List<PrinterDTO> fetchPrinters(Provider provider) throws PrintProviderException;
+  public List<PrinterDTO> fetchPrinters(Provider provider) throws PrintProviderException {
+    return Collections.emptyList(); // default: no printers
+  }
 
   /**
-   * Renders a label file for the target record using the selected template line.
+   * Generates a label for the given record based on the template location.
    *
-   * <p>Typical implementations will resolve and run a Jasper report or a template engine
-   * to produce a PDF/ZPL/PNG file. The returned file must exist and be readable.</p>
+   * <p>This method takes the {@code templateRef} as a parameter and resolves it
+   * to an absolute path. It then compiles it (if it's a .jrxml file) or loads it
+   * (if it's a .jasper file) and then fills it with the given {@code recordId}
+   * and {@code parameters}.</p>
+   *
+   * <p>The generated PDF is saved to a temporary file and that file is
+   * returned.</p>
+   *
+   * <p>This method is a no-op by default, throwing an
+   * {@link UnsupportedOperationException}. It is expected that subclasses
+   * override this method to implement the printing provider's logic for
+   * generating labels.</p>
    *
    * @param provider
-   *     print provider configuration (may carry options influencing content type).
+   *     the provider configuration containing API endpoint and key.
    * @param table
-   *     AD table of the record to print (e.g., {@code M_InOut}).
+   *     Target table
    * @param recordId
-   *     primary key of the record to print.
+   *     Target record ID
    * @param templateLineRef
-   *     selected {@code ETPP_TemplateLine} that contains the template location and flags.
+   *     TemplateLine instance
    * @param parameters
-   *     raw process parameters (may include user-selected options like copies, language, etc.).
-   * @return a {@link File} pointing to the generated label (temporary file recommended).
+   *     Extra parameters for the report
+   * @return
+   *     Generated PDF file
    * @throws PrintProviderException
-   *     if the template cannot be loaded, rendering fails, or the output cannot be written.
+   *     If there is an error generating the label
    */
-  File generateLabel(Provider provider,
+  public File generateLabel(Provider provider,
       Table table,
       String recordId,
       TemplateLine templateLineRef,
-      JSONObject parameters) throws PrintProviderException;
+      JSONObject parameters) throws PrintProviderException {
+    throw new UnsupportedOperationException("generateLabel not implemented by " + getClass().getSimpleName());
+  }
 
   /**
-   * Sends the generated label to the provider’s print queue and returns a provider job identifier.
+   * Sends the given {@code labelFile} to the printer specified by
+   * {@code printer} using the configuration in {@code provider}.
    *
-   * <p>Implementations should pick the appropriate content type (e.g., {@code pdf_base64})
-   * and submit the job to the provider’s API or spooler using credentials from {@link Provider}.</p>
+   * <p>This method is a no-op by default, throwing an
+   * {@link UnsupportedOperationException}. It is expected that subclasses
+   * override this method to implement the printing provider's logic for
+   * sending print jobs.</p>
    *
    * @param provider
-   *     print provider configuration (endpoints, API key, org/client).
+   *     the provider configuration containing API endpoint and key.
    * @param printer
-   *     DAL {@code ETPP_Printer} row indicating the destination device; its {@code value}
-   *     stores the provider’s external printer id.
+   *     the target printer
    * @param labelFile
-   *     file previously created by {@link #generateLabel}; must exist and be readable.
-   * @return provider job id (stringified) if available; otherwise a non-empty fallback summary.
+   *     the generated PDF file to send to the printer
+   * @return
+   *     the print job ID returned by the provider
    * @throws PrintProviderException
-   *     if authentication fails, the destination printer is not accepted, the request is rejected,
-   *     there is a transport error, or the response cannot be interpreted.
+   *     If there is an error sending the print job
    */
-  String sendToPrinter(Provider provider,
+  public String sendToPrinter(Provider provider,
       Printer printer,
-      File labelFile) throws PrintProviderException;
+      File labelFile) throws PrintProviderException {
+    throw new UnsupportedOperationException("sendToPrinter not implemented by " + getClass().getSimpleName());
+  }
 }

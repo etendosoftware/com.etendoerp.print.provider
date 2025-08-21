@@ -119,8 +119,7 @@ public class SendGeneratedLabelToPrinter extends Action {
       final TemplateLine templateLine = resolveTemplate(table);
 
       final File label = strategy.generateLabel(provider, table, recordId, templateLine, parameters);
-      String jobId = strategy.sendToPrinter(provider, targetPrinter, label);
-
+      final String jobId = strategy.sendToPrinter(provider, targetPrinter, label);
       res.setMessage(String.format(
           OBMessageUtils.messageBD("ETPP_PrintJobSent"), (jobId == null ? "-" : jobId)));
       return res;
