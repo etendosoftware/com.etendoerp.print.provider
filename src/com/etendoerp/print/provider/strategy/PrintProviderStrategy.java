@@ -118,8 +118,7 @@ public abstract class PrintProviderStrategy {
    *     TemplateLine instance
    * @param parameters
    *     Extra parameters for the report
-   * @return
-   *     Generated PDF file
+   * @return Generated PDF file
    * @throws PrintProviderException
    *     If there is an error generating the label
    */
@@ -144,15 +143,17 @@ public abstract class PrintProviderStrategy {
    *     the provider configuration containing API endpoint and key.
    * @param printer
    *     the target printer
+   * @param numberOfCopies
+   *     the number of copies to print
    * @param labelFile
    *     the generated PDF file to send to the printer
-   * @return
-   *     the print job ID returned by the provider
+   * @return the print job ID returned by the provider
    * @throws PrintProviderException
    *     If there is an error sending the print job
    */
   public String sendToPrinter(Provider provider,
       Printer printer,
+      int numberOfCopies,
       File labelFile) throws PrintProviderException {
     throw new UnsupportedOperationException("sendToPrinter not implemented by " + getClass().getSimpleName());
   }
