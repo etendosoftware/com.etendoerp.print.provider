@@ -45,12 +45,14 @@ public class PrinterUtils {
   public static final String MISSING_PARAMETER_MSG = "ETPP_MissingParameter";
   public static final String PROVIDER_NOT_FOUND_MSG = "ETPP_ProviderNotFound";
 
-  // ---------------------------------------------------------------------------
-  // DAL lookups (throwing OBException with i18n when not found)
-  // ---------------------------------------------------------------------------
-
   /**
-   * Loads a Provider by id or throws OBException(i18n).
+   * Loads a Provider by ID or throws OBException(i18n with name).
+   *
+   * @param providerId
+   *     the ID of the provider to load
+   * @return the loaded provider
+   * @throws OBException
+   *     if the provider is not found
    */
   public static Provider requireProvider(final String providerId) {
     final Provider provider = OBDal.getInstance().get(Provider.class, providerId);
@@ -61,7 +63,13 @@ public class PrinterUtils {
   }
 
   /**
-   * Loads a Printer by id or throws OBException(i18n with id).
+   * Loads a Printer by ID or throws OBException(i18n with name).
+   *
+   * @param printerId
+   *     the ID of the printer to load
+   * @return the loaded printer
+   * @throws OBException
+   *     if the printer is not found
    */
   public static Printer requirePrinter(final String printerId) {
     final Printer printer = OBDal.getInstance().get(Printer.class, printerId);
@@ -73,6 +81,12 @@ public class PrinterUtils {
 
   /**
    * Loads a Table by name (AD_Table.name) or throws OBException(i18n with name).
+   *
+   * @param entityName
+   *     the name of the table to load
+   * @return the loaded table
+   * @throws OBException
+   *     if the table is not found
    */
   public static Table requireTableByName(final String entityName) {
     OBCriteria<Table> tableOBCriteria = OBDal.getInstance().createCriteria(Table.class);
@@ -88,6 +102,12 @@ public class PrinterUtils {
   /**
    * Resolves the TemplateLine for a given table, preferring defaults and ordering by lineNo.
    * Throws OBException(i18n) if there is no Template for that table.
+   *
+   * @param table
+   *     the table to resolve the TemplateLine for
+   * @return the resolved TemplateLine
+   * @throws OBException
+   *     if there is no Template for the table
    */
   public static TemplateLine resolveTemplateLineFor(final Table table) {
     // Get Template by table
@@ -109,13 +129,17 @@ public class PrinterUtils {
     return (TemplateLine) templateLineOBCriteria.uniqueResult();
   }
 
-  // ---------------------------------------------------------------------------
-  // ProviderParam helpers
-  // ---------------------------------------------------------------------------
-
   /**
    * Returns the ProviderParam for the given provider and key OR throws an OBException(i18n)
    * if it does not exist or the key is blank.
+   *
+   * @param provider
+   *     the provider to get the ProviderParam for
+   * @param paramKey
+   *     the key of the ProviderParam to get
+   * @return the ProviderParam for the given provider and key
+   * @throws OBException
+   *     if the ProviderParam does not exist or the key is blank
    */
   public static ProviderParam getRequiredParam(final Provider provider, final String paramKey) {
     if (provider == null) {
@@ -138,7 +162,16 @@ public class PrinterUtils {
   }
 
   /**
-   * Ensures a non-blank String is present at root level; throws OBException(i18n MissingParameter) otherwise.
+   * Ensures a non-blank String is present at root level; throws OBException(i18n MissingParameter)
+   * otherwise.
+   *
+   * @param json
+   *     the JSON object to get the parameter from
+   * @param key
+   *     the key of the parameter to get
+   * @return the non-blank String value of the parameter
+   * @throws OBException
+   *     if the parameter is missing or blank
    */
   public static String requireParam(final JSONObject json, final String key) {
     final String value = json.optString(key, null);
@@ -151,6 +184,14 @@ public class PrinterUtils {
   /**
    * Ensures a non-empty JSONArray is present at the given key; throws OBException(i18n MissingParameter)
    * otherwise.
+   *
+   * @param json
+   *     the JSON object to get the JSONArray from
+   * @param key
+   *     the key of the JSONArray to get
+   * @return the non-empty JSONArray at the given key
+   * @throws OBException
+   *     if the JSONArray is missing or empty
    */
   public static JSONArray requireJSONArray(final JSONObject json, final String key) {
     final JSONArray value = json.optJSONArray(key);
@@ -162,6 +203,14 @@ public class PrinterUtils {
 
   /**
    * Ensures a positive integer is present; throws with MissingParameter or CopiesInvalid messages.
+   *
+   * @param json
+   *     the JSON object to get the parameter from
+   * @param key
+   *     the key of the parameter to get
+   * @return the positive integer value of the parameter
+   * @throws OBException
+   *     if the parameter is missing or not a positive integer
    */
   public static int requirePositiveInt(final JSONObject json, final String key) {
     if (!json.has(key)) {

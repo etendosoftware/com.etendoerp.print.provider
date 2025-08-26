@@ -32,7 +32,12 @@ import com.etendoerp.print.provider.utils.ProviderStrategyResolver;
 import com.smf.jobs.ActionResult;
 import com.smf.jobs.Result;
 
-public class SendGeneratedLabelToPrinterTest {
+/**
+ * Unit tests for the SendGeneratedLabelToPrinter class.
+ * Validates error handling and label printing logic, including scenarios
+ * with missing parameters, not found entities, and exceptions thrown by the print provider.
+ */
+class SendGeneratedLabelToPrinterTest {
 
   // Constants used for test scenarios
   private static final String PROV_OK = "prov-ok";
@@ -60,7 +65,6 @@ public class SendGeneratedLabelToPrinterTest {
   // Mocks for DAL and domain objects
   private OBDal dal;
   private Provider provider;
-  private Printer printer;
   private OBCriteria<Table> tableCrit;
   private Table table;
   private TemplateLine tLine;
@@ -158,7 +162,7 @@ public class SendGeneratedLabelToPrinterTest {
     provider = Mockito.mock(Provider.class);
     Mockito.when(dal.get(Provider.class, PROV_OK)).thenReturn(provider);
 
-    printer = Mockito.mock(Printer.class);
+    Printer printer = Mockito.mock(Printer.class);
     Mockito.when(dal.get(Printer.class, PRN_OK)).thenReturn(printer);
 
     // Mock criteria for table lookup

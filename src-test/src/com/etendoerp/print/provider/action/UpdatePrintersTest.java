@@ -39,6 +39,13 @@ import com.etendoerp.print.provider.utils.ProviderStrategyResolver;
 import com.smf.jobs.ActionResult;
 import com.smf.jobs.Result;
 
+/**
+ * Unit tests for the UpdatePrinters action.
+ * <p>
+ * This class verifies the correct behavior of printer creation, update, inactivation,
+ * error handling, and message generation when synchronizing printers with a provider.
+ * It uses Mockito to mock dependencies and static methods, and JUnit 5 for test execution.
+ */
 class UpdatePrintersTest {
 
   // Constants for provider IDs and message keys
@@ -125,9 +132,12 @@ class UpdatePrintersTest {
 
   /**
    * Helper method to create JSON parameters for the provider.
-   * @param providerId The provider ID to include in the parameters.
+   *
+   * @param providerId
+   *     The provider ID to include in the parameters.
    * @return JSONObject with provider parameters.
-   * @throws JSONException if JSON construction fails.
+   * @throws JSONException
+   *     if JSON construction fails.
    */
   private static JSONObject params(String providerId) throws JSONException {
     // Build a JSON object with the provider parameter
@@ -140,11 +150,13 @@ class UpdatePrintersTest {
 
   /**
    * Helper method to create a mocked OBCriteria that returns itself for method chaining.
-   * @param <T> Type of BaseOBObject.
+   *
+   * @param <T>
+   *     Type of BaseOBObject.
    * @return Mocked OBCriteria instance.
    */
   @SuppressWarnings("unchecked")
-  private static <T extends BaseOBObject> OBCriteria<T> criteriaRETURNS_SELF() {
+  private static <T extends BaseOBObject> OBCriteria<T> criteriaReturnsSelf() {
     // Return a mock OBCriteria that supports method chaining
     return (OBCriteria<T>) Mockito.mock(
         OBCriteria.class,
@@ -153,7 +165,9 @@ class UpdatePrintersTest {
 
   /**
    * Stubs OBContext static methods to no-op for admin mode changes.
-   * @param sCtx MockedStatic of OBContext.
+   *
+   * @param sCtx
+   *     MockedStatic of OBContext.
    */
   private static void stubOBContextNoOp(MockedStatic<OBContext> sCtx) {
     // Make admin mode methods do nothing for tests
@@ -163,7 +177,9 @@ class UpdatePrintersTest {
 
   /**
    * Stubs OBMessageUtils static methods for internationalization messages.
-   * @param sMsg MockedStatic of OBMessageUtils.
+   *
+   * @param sMsg
+   *     MockedStatic of OBMessageUtils.
    */
   private static void stubI18N(MockedStatic<OBMessageUtils> sMsg) {
     // Stub I18N message methods for test messages
@@ -195,7 +211,9 @@ class UpdatePrintersTest {
 
   /**
    * Test that verifies printers are created, updated, inactivated and the correct message is built.
-   * @throws Exception if any error occurs during the test.
+   *
+   * @throws Exception
+   *     if any error occurs during the test.
    */
   @Test
   void actionSuccessCreatesUpdatesInactivatesAndBuildsMessage() throws Exception {
@@ -208,10 +226,10 @@ class UpdatePrintersTest {
     when(strategy.fetchPrinters(eq(provider))).thenReturn(remote);
 
     // Mock criteria for each printer
-    OBCriteria<Printer> c1 = criteriaRETURNS_SELF();
-    OBCriteria<Printer> c2 = criteriaRETURNS_SELF();
-    OBCriteria<Printer> c3 = criteriaRETURNS_SELF();
-    OBCriteria<Printer> cInact = criteriaRETURNS_SELF();
+    OBCriteria<Printer> c1 = criteriaReturnsSelf();
+    OBCriteria<Printer> c2 = criteriaReturnsSelf();
+    OBCriteria<Printer> c3 = criteriaReturnsSelf();
+    OBCriteria<Printer> cInact = criteriaReturnsSelf();
     when(obdal.createCriteria(eq(Printer.class))).thenReturn(c1, c2, c3, cInact);
 
     // Simulate existing printer found for "1", not found for "2" and "3"
@@ -245,7 +263,9 @@ class UpdatePrintersTest {
 
   /**
    * Test that verifies error handling when provider parameter is missing.
-   * @throws Exception if any error occurs during the test.
+   *
+   * @throws Exception
+   *     if any error occurs during the test.
    */
   @Test
   void actionErrorMissingProviderParam() throws Exception {
@@ -263,7 +283,9 @@ class UpdatePrintersTest {
 
   /**
    * Test that verifies error handling when provider is not found.
-   * @throws Exception if any error occurs during the test.
+   *
+   * @throws Exception
+   *     if any error occurs during the test.
    */
   @Test
   void actionErrorProviderNotFound() throws Exception {
@@ -278,7 +300,9 @@ class UpdatePrintersTest {
 
   /**
    * Test that verifies error handling when strategy throws PrintProviderException.
-   * @throws Exception if any error occurs during the test.
+   *
+   * @throws Exception
+   *     if any error occurs during the test.
    */
   @Test
   void actionErrorStrategyThrowsPrintProviderExceptionAndRollsBack() throws Exception {
