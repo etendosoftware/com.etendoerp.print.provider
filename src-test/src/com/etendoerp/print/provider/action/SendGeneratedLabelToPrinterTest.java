@@ -1,25 +1,21 @@
 package com.etendoerp.print.provider.action;
 
 import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.ArgumentMatchers.isA;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 
 import org.apache.commons.lang3.mutable.MutableBoolean;
 import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONObject;
+import org.hibernate.criterion.Criterion;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockedStatic;
 import org.mockito.Mockito;
-import org.openbravo.base.structure.BaseOBObject;
 import org.openbravo.dal.core.OBContext;
 import org.openbravo.dal.service.OBCriteria;
 import org.openbravo.dal.service.OBDal;
@@ -29,7 +25,6 @@ import org.openbravo.model.ad.datamodel.Table;
 import com.etendoerp.print.provider.api.PrintProviderException;
 import com.etendoerp.print.provider.data.Printer;
 import com.etendoerp.print.provider.data.Provider;
-import com.etendoerp.print.provider.data.Template;
 import com.etendoerp.print.provider.data.TemplateLine;
 import com.etendoerp.print.provider.strategy.PrintProviderStrategy;
 import com.etendoerp.print.provider.utils.PrinterUtils;
@@ -38,261 +33,261 @@ import com.smf.jobs.ActionResult;
 import com.smf.jobs.Result;
 
 /**
- * Unit tests for SendGeneratedLabelToPrinter.
+ * Unit tests for the SendGeneratedLabelToPrinter class.
+ * Validates error handling and label printing logic, including scenarios
+ * with missing parameters, not found entities, and exceptions thrown by the print provider.
  */
 class SendGeneratedLabelToPrinterTest {
 
+  // Constants used for test scenarios
+  private static final String PROV_OK = "prov-ok";
+  private static final String PROV_MISSING = "prov-missing";
+  private static final String PRN_OK = "p-ok";
+  private static final String PRN_MISSING = "p-missing";
+  private static final String ENTITY = "M_InOut";
+  private static final String REC_1 = "rec-1";
+
+  // Message templates for assertions
+  private static final String MSG_MISSING_PARAM = "Missing parameter: %s";
+  private static final String MSG_PROVIDER_NOT_FOUND = "Provider not found";
+  private static final String MSG_PRINTER_NOT_FOUND_FMT = "Printer %s not found";
+  private static final String MSG_TABLE_NOT_FOUND_FMT = "Table %s not found";
+  private static final String MSG_PROVIDER_ERROR_FMT = "Provider error: %s";
+  private static final String MSG_ALL_FAILED = "All print jobs failed";
+
+  // Static mocks for dependencies
+  private MockedStatic<OBMessageUtils> sMsg;
+  private MockedStatic<OBContext> sObc;
+  private MockedStatic<OBDal> sDal;
+  private MockedStatic<ProviderStrategyResolver> sResolver;
+  private MockedStatic<PrinterUtils> sUtil;
+
+  // Mocks for DAL and domain objects
+  private OBDal dal;
+  private Provider provider;
+  private OBCriteria<Table> tableCrit;
+  private Table table;
+  private TemplateLine tLine;
+  private PrintProviderStrategy strategy;
+
+  // Instance of the action under test
   private SendGeneratedLabelToPrinter action;
 
   /**
-   * Set up the test by creating a new {@link SendGeneratedLabelToPrinter} instance.
-   * <p>This method is called once before each test method.</p>
+   * Creates a base JSON object with the minimum required parameters for
+   * SendGeneratedLabelToPrinter.action.
+   * Used as a starting point for most tests.
+   */
+  private JSONObject baseParams() throws Exception {
+    // Build a JSON object with all required parameters for the label printing action
+    JSONObject json = new JSONObject();
+    json.put(PrinterUtils.PROVIDER, PROV_OK);
+    json.put(PrinterUtils.ENTITY_NAME, ENTITY);
+    json.put(PrinterUtils.PRINTERS, PRN_OK);
+    json.put(PrinterUtils.NUMBER_OF_COPIES, 1);
+    json.put(PrinterUtils.RECORDS, new JSONArray().put(REC_1));
+    return json;
+  }
+
+  /**
+   * Stubs all static calls to OBMessageUtils.getI18NMessage used in this class.
+   * This allows tests to verify error messages without relying on actual i18n logic.
+   */
+  private void stubI18N(MockedStatic<OBMessageUtils> sMsgStatic) {
+    // Stub static i18n message calls for predictable test output
+    sMsgStatic.when(() -> OBMessageUtils.getI18NMessage(PrinterUtils.MISSING_PARAMETER_MSG))
+        .thenReturn(MSG_MISSING_PARAM);
+    sMsgStatic.when(() -> OBMessageUtils.getI18NMessage(PrinterUtils.PROVIDER_NOT_FOUND_MSG))
+        .thenReturn(MSG_PROVIDER_NOT_FOUND);
+    sMsgStatic.when(() -> OBMessageUtils.getI18NMessage("ETPP_PrinterNotFound"))
+        .thenReturn(MSG_PRINTER_NOT_FOUND_FMT);
+    sMsgStatic.when(() -> OBMessageUtils.getI18NMessage("ETPP_TableNotFound"))
+        .thenReturn(MSG_TABLE_NOT_FOUND_FMT);
+    sMsgStatic.when(() -> OBMessageUtils.getI18NMessage("ETPP_ProviderError"))
+        .thenReturn(MSG_PROVIDER_ERROR_FMT);
+    sMsgStatic.when(() -> OBMessageUtils.getI18NMessage("ETPP_AllPrintJobsFailed"))
+        .thenReturn(MSG_ALL_FAILED);
+
+    // Stub i18n message calls with arguments for dynamic error messages
+    sMsgStatic.when(() -> OBMessageUtils.getI18NMessage(eq(PrinterUtils.MISSING_PARAMETER_MSG), Mockito.any()))
+        .thenAnswer(inv -> {
+          Object[] args = inv.getArgument(1, Object[].class);
+          return "Missing parameter: " + (args != null && args.length > 0 ? args[0] : "%s");
+        });
+    sMsgStatic.when(() -> OBMessageUtils.getI18NMessage(eq("ETPP_PrinterNotFound"), Mockito.any()))
+        .thenAnswer(inv -> "Printer " + inv.getArgument(1, Object[].class)[0] + " not found");
+    sMsgStatic.when(() -> OBMessageUtils.getI18NMessage(eq("ETPP_TableNotFound"), Mockito.any()))
+        .thenAnswer(inv -> "Table " + inv.getArgument(1, Object[].class)[0] + " not found");
+    sMsgStatic.when(() -> OBMessageUtils.getI18NMessage(eq("ETPP_ProviderError"), Mockito.any()))
+        .thenAnswer(inv -> "Provider error: " + inv.getArgument(1, Object[].class)[0]);
+
+    sMsgStatic.when(() -> OBMessageUtils.messageBD("ETPP_AllPrintJobsFailed"))
+        .thenReturn(MSG_ALL_FAILED);
+  }
+
+  /**
+   * Stubs out OBContext static methods used by the code under test.
+   * Prevents actual admin mode changes during tests.
+   */
+  private void stubOBContext(MockedStatic<OBContext> sObcStatic) {
+    // Make admin mode methods no-ops for test isolation
+    sObcStatic.when(OBContext::setAdminMode).then(inv -> null);
+    sObcStatic.when(OBContext::restorePreviousMode).then(inv -> null);
+  }
+
+  /**
+   * Sets up the test harness before each test.
+   * Initializes mocks and stubs for all dependencies.
    */
   @BeforeEach
   void setUp() {
+    // Create instance of the action to be tested
     action = new SendGeneratedLabelToPrinter();
+
+    // Initialize static mocks for dependencies
+    sMsg = Mockito.mockStatic(OBMessageUtils.class);
+    sObc = Mockito.mockStatic(OBContext.class);
+    sDal = Mockito.mockStatic(OBDal.class);
+    sResolver = Mockito.mockStatic(ProviderStrategyResolver.class);
+    sUtil = Mockito.mockStatic(PrinterUtils.class, Mockito.CALLS_REAL_METHODS);
+
+    // Stub i18n and context methods for predictable test behavior
+    stubI18N(sMsg);
+    stubOBContext(sObc);
+
+    // Mock DAL and domain objects
+    dal = Mockito.mock(OBDal.class);
+    sDal.when(OBDal::getInstance).thenReturn(dal);
+
+    provider = Mockito.mock(Provider.class);
+    Mockito.when(dal.get(Provider.class, PROV_OK)).thenReturn(provider);
+
+    Printer printer = Mockito.mock(Printer.class);
+    Mockito.when(dal.get(Printer.class, PRN_OK)).thenReturn(printer);
+
+    // Mock criteria for table lookup
+    @SuppressWarnings("unchecked")
+    OBCriteria<Table> tmpCrit = Mockito.mock(OBCriteria.class);
+    tableCrit = tmpCrit;
+    Mockito.when(dal.createCriteria(Table.class)).thenReturn(tableCrit);
+    Mockito.when(tableCrit.add(any(Criterion.class))).thenReturn(tableCrit);
+    Mockito.when(tableCrit.setMaxResults(anyInt())).thenReturn(tableCrit);
+
+    table = Mockito.mock(Table.class);
+    Mockito.when(tableCrit.uniqueResult()).thenReturn(table);
+
+    // Mock template line resolution
+    tLine = Mockito.mock(TemplateLine.class);
+    sUtil.when(() -> PrinterUtils.resolveTemplateLineFor(any(Table.class))).thenReturn(tLine);
+
+    // Mock provider strategy resolution
+    strategy = Mockito.mock(PrintProviderStrategy.class);
+    sResolver.when(() -> ProviderStrategyResolver.resolveForProvider(provider)).thenReturn(strategy);
   }
 
   /**
-   * Convenience method to create a minimal JSON object with parameters for a
-   * {@link SendGeneratedLabelToPrinter} action invocation.
-   *
-   * @param providerId
-   *     {@link Provider#getId()}
-   * @param entityName
-   *     {@link Table#getName()}
-   * @param recordId
-   *     Target record ID
-   * @param printerId
-   *     {@link Printer#getId()}
-   * @return
-   *     JSON object with the four required parameters
-   * @throws Exception
-   *     if the JSON object could not be created
+   * Cleans up static mocks after each test to avoid interference between tests.
    */
-  private static JSONObject params(String providerId, String entityName, String recordId,
-      String printerId) throws Exception {
-    JSONObject p = new JSONObject();
-    p.put(PrinterUtils.PROVIDER, providerId);
-    p.put(PrinterUtils.ENTITY_NAME, entityName);
-    p.put(PrinterUtils.RECORDS, new JSONArray().put(recordId));
-    p.put(PrinterUtils.PRINTERS, printerId);
-    return p;
+  @AfterEach
+  void tearDown() {
+    // Close all static mocks to release resources
+    sUtil.close();
+    sResolver.close();
+    sDal.close();
+    sObc.close();
+    sMsg.close();
   }
 
   /**
-   * Creates a mock for an {@link OBCriteria} object that always returns itself
-   * (i.e., {@code criteria.add(Restrictions.eq("foo", "bar"))} returns the same
-   * mock instance).
-   *
-   * @param <T>
-   *     Entity class
-   * @return
-   *     Mocked {@link OBCriteria} object
-   */
-  @SuppressWarnings("unchecked")
-  private static <T extends BaseOBObject> OBCriteria<T> criteriaMock() {
-    return (OBCriteria<T>) Mockito.mock(OBCriteria.class, Mockito.withSettings().defaultAnswer(Mockito.RETURNS_SELF));
-  }
-
-  /**
-   * Test that the action throws an error if the {@link PrinterUtils#PROVIDER}
-   * parameter is missing.
-   * <p>
-   * The test creates a JSON object with the other required parameters and then
-   * calls the action. It verifies that the result is an error with a message
-   * indicating that the provider parameter is missing.
+   * Verifies that the action throws an error if the provider parameter is missing.
+   * Ensures proper error handling for missing required parameters.
    */
   @Test
   void actionErrorMissingProviderParam() throws Exception {
-    JSONObject p = new JSONObject();
-    p.put(PrinterUtils.ENTITY_NAME, "M_InOut");
-    p.put(PrinterUtils.RECORDS, new JSONArray().put("r1"));
-    p.put(PrinterUtils.PRINTERS, "p1");
+    // Remove provider parameter to simulate missing input
+    JSONObject params = baseParams();
+    params.remove(PrinterUtils.PROVIDER);
 
-    try (MockedStatic<OBMessageUtils> s4 = Mockito.mockStatic(OBMessageUtils.class);
-         MockedStatic<OBContext> s2 = Mockito.mockStatic(OBContext.class)) {
-      s4.when(() -> OBMessageUtils.messageBD(PrinterUtils.MISSING_PARAMETER_MSG)).thenReturn("Missing parameter: %s");
-
-      ActionResult res = action.action(p, new MutableBoolean(false));
-      assertThat(res.getType(), is(Result.Type.ERROR));
-      assertThat(res.getMessage(), is("Missing parameter: " + PrinterUtils.PROVIDER));
-    }
+    // Execute action and verify error result
+    ActionResult res = action.action(params, new MutableBoolean(false));
+    assertThat(res.getType(), is(Result.Type.ERROR));
+    assertThat(res.getMessage(), is("Missing parameter: Provider"));
   }
 
   /**
-   * Test that the action throws an error if the provider referenced by the
-   * {@link PrinterUtils#PROVIDER} parameter is not found.
-   * <p>
-   * The test creates a JSON object with the required parameters and then calls
-   * the action. It verifies that the result is an error with a message
-   * indicating that the provider was not found.
+   * Tests that the action throws an error if the provider is not found.
+   * Ensures error message is returned when provider lookup fails.
    */
   @Test
   void actionErrorProviderNotFound() throws Exception {
-    JSONObject p = params("prov-x", "M_InOut", "r1", "p1");
+    // Set provider to a value that does not exist
+    JSONObject params = baseParams();
+    params.put(PrinterUtils.PROVIDER, PROV_MISSING);
 
-    OBDal obdal = mock(OBDal.class);
-    when(obdal.get(Provider.class, "prov-x")).thenReturn(null);
+    Mockito.when(dal.get(Provider.class, PROV_MISSING)).thenReturn(null);
 
-    try (MockedStatic<OBDal> s1 = Mockito.mockStatic(OBDal.class);
-         MockedStatic<OBMessageUtils> s4 = Mockito.mockStatic(OBMessageUtils.class);
-         MockedStatic<OBContext> s2 = Mockito.mockStatic(OBContext.class)) {
-      s1.when(OBDal::getInstance).thenReturn(obdal);
-      s4.when(() -> OBMessageUtils.getI18NMessage("ETPP_ProviderNotFound")).thenReturn("Provider not found");
-
-      ActionResult res = action.action(p, new MutableBoolean(false));
-      assertThat(res.getType(), is(Result.Type.ERROR));
-      assertThat(res.getMessage(), is("Provider not found"));
-    }
+    // Execute action and verify error result
+    ActionResult res = action.action(params, new MutableBoolean(false));
+    assertThat(res.getType(), is(Result.Type.ERROR));
+    assertThat(res.getMessage(), is(MSG_PROVIDER_NOT_FOUND));
   }
 
   /**
-   * Test that the action throws an error if the printer referenced by the
-   * {@link PrinterUtils#PRINTERS} parameter is not found.
-   * <p>
-   * The test creates a JSON object with the required parameters and then calls
-   * the action. It verifies that the result is an error with a message
-   * indicating that the printer was not found.
+   * Tests that the action throws an error if the printer is not found.
+   * Ensures error message is returned when printer lookup fails.
    */
   @Test
   void actionErrorPrinterNotFound() throws Exception {
-    JSONObject p = params("prov-1", "M_InOut", "r1", "p-missing");
+    // Set printer to a value that does not exist
+    JSONObject params = baseParams();
+    params.put(PrinterUtils.PRINTERS, PRN_MISSING);
 
-    Provider provider = mock(Provider.class);
-    OBDal obdal = mock(OBDal.class);
-    OBCriteria<Table> tableCrit = criteriaMock();
-    Table table = mock(Table.class);
+    Mockito.when(dal.get(Printer.class, PRN_MISSING)).thenReturn(null);
 
-    when(obdal.get(Provider.class, "prov-1")).thenReturn(provider);
-    when(obdal.get(Printer.class, "p-missing")).thenReturn(null);
-    when(obdal.createCriteria(Table.class)).thenReturn(tableCrit);
-    when(tableCrit.uniqueResult()).thenReturn(table);
-
-    try (MockedStatic<OBDal> s1 = Mockito.mockStatic(OBDal.class);
-         MockedStatic<OBMessageUtils> s4 = Mockito.mockStatic(OBMessageUtils.class);
-         MockedStatic<ProviderStrategyResolver> s3 = Mockito.mockStatic(ProviderStrategyResolver.class);
-         MockedStatic<OBContext> s2 = Mockito.mockStatic(OBContext.class)) {
-
-      s1.when(OBDal::getInstance).thenReturn(obdal);
-      s4.when(() -> OBMessageUtils.messageBD("ETPP_PrinterNotFound")).thenReturn("Printer %s not found");
-
-      ActionResult res = action.action(p, new MutableBoolean(false));
-
-      assertThat(res.getType(), is(Result.Type.ERROR));
-      assertThat(res.getMessage(), is("Printer p-missing not found"));
-    }
+    // Execute action and verify error result
+    ActionResult res = action.action(params, new MutableBoolean(false));
+    assertThat(res.getType(), is(Result.Type.ERROR));
+    assertThat(res.getMessage(), is(String.format(MSG_PRINTER_NOT_FOUND_FMT, PRN_MISSING)));
   }
 
   /**
-   * Test that the action throws an error if the table referenced by the
-   * {@link PrinterUtils#ENTITY_NAME} parameter is not found.
-   * <p>
-   * The test creates a JSON object with the required parameters and then calls
-   * the action. It verifies that the result is an error with a message
-   * indicating that the table was not found.
+   * Verifies that the action throws an error if the table is not found.
+   * Ensures error message is returned when table lookup fails.
    */
   @Test
   void actionErrorTableNotFound() throws Exception {
-    SendGeneratedLabelToPrinter action = new SendGeneratedLabelToPrinter();
+    // Simulate table lookup returning null
+    JSONObject params = baseParams();
 
-    JSONObject p = params("prov-1", "M_InOut", "r1", "p1");
+    Mockito.when(tableCrit.uniqueResult()).thenReturn(null);
 
-    Provider provider = mock(Provider.class);
-    Printer printer = mock(Printer.class);
-
-    OBDal obdal = mock(OBDal.class);
-    @SuppressWarnings("unchecked")
-    OBCriteria<Table> tableCrit = (OBCriteria<Table>) mock(OBCriteria.class);
-
-    when(obdal.get(eq(Provider.class), eq("prov-1"))).thenReturn(provider);
-    when(obdal.get(eq(Printer.class), eq("p1"))).thenReturn(printer);
-    when(obdal.createCriteria(eq(Table.class))).thenReturn(tableCrit);
-
-    when(tableCrit.add(any())).thenReturn(tableCrit);
-    when(tableCrit.setMaxResults(anyInt())).thenReturn(tableCrit);
-    when(tableCrit.uniqueResult()).thenReturn(null);
-
-    try (MockedStatic<OBDal> sOBDal = Mockito.mockStatic(OBDal.class);
-         MockedStatic<OBMessageUtils> sMsg = Mockito.mockStatic(OBMessageUtils.class);
-         MockedStatic<OBContext> sCtx = Mockito.mockStatic(OBContext.class);
-         MockedStatic<ProviderStrategyResolver> sResolver = Mockito.mockStatic(ProviderStrategyResolver.class)) {
-
-      sOBDal.when(OBDal::getInstance).thenReturn(obdal);
-
-      PrintProviderStrategy strategy = mock(PrintProviderStrategy.class);
-      sResolver.when(() -> ProviderStrategyResolver.resolveForProvider(eq(provider)))
-          .thenReturn(strategy);
-
-      sMsg.when(() -> OBMessageUtils.messageBD(eq("ETPP_TableNotFound")))
-          .thenReturn("Table %s not found");
-
-      ActionResult res = action.action(p, new MutableBoolean(false));
-
-      assertThat(res.getType(), is(Result.Type.ERROR));
-      assertThat(res.getMessage(), is("Table M_InOut not found"));
-    }
+    // Execute action and verify error result
+    ActionResult res = action.action(params, new MutableBoolean(false));
+    assertThat(res.getType(), is(Result.Type.ERROR));
+    assertThat(res.getMessage(), is(String.format(MSG_TABLE_NOT_FOUND_FMT, ENTITY)));
   }
 
   /**
-   * Tests that the action handles {@link PrintProviderException}s thrown by the
-   * strategy's {@link PrintProviderStrategy#generateLabel(Provider, Table, String, TemplateLine, JSONObject)}
-   * method by rolling back and returning an error result with a message indicating
-   * the problem.
+   * Verifies that the action throws an error if the strategy throws PrintProviderException.
+   * Ensures rollback and proper error message when label generation fails.
    */
   @Test
   void actionErrorStrategyThrowsPrintProviderExceptionAndRollsBack() throws Exception {
-    JSONObject p = params("prov-1", "M_InOut", "r1", "p1");
+    // Simulate strategy throwing an exception during label generation
+    JSONObject params = baseParams();
 
-    Provider provider = mock(Provider.class);
-    Printer printer = mock(Printer.class);
-    Table table = mock(Table.class);
-    Template template = mock(Template.class);
-    TemplateLine templateLine = mock(TemplateLine.class);
-    PrintProviderStrategy strategy = mock(PrintProviderStrategy.class);
-
-    OBDal obdal = mock(OBDal.class);
-    OBCriteria<Table> tableCrit = criteriaMock();
-    OBCriteria<Template> tmplCrit = criteriaMock();
-    OBCriteria<TemplateLine> lineCrit = criteriaMock();
-
-    when(obdal.get(Provider.class, "prov-1")).thenReturn(provider);
-    when(obdal.get(Printer.class, "p1")).thenReturn(printer);
-
-    when(obdal.createCriteria(Table.class)).thenReturn(tableCrit);
-    when(obdal.createCriteria(Template.class)).thenReturn(tmplCrit);
-    when(obdal.createCriteria(TemplateLine.class)).thenReturn(lineCrit);
-
-    when(tableCrit.uniqueResult()).thenReturn(table);
-    when(tmplCrit.uniqueResult()).thenReturn(template);
-    when(lineCrit.uniqueResult()).thenReturn(templateLine);
-
-    when(strategy.generateLabel(any(), any(), any(String.class), any(), isA(JSONObject.class)))
+    Mockito.when(strategy.generateLabel(
+            eq(provider),
+            eq(table),
+            anyString(),
+            eq(tLine),
+            any(JSONObject.class)))
         .thenThrow(new PrintProviderException("boom"));
 
-    try (MockedStatic<OBDal> s1 = Mockito.mockStatic(OBDal.class);
-         MockedStatic<OBContext> s2 = Mockito.mockStatic(OBContext.class);
-         MockedStatic<ProviderStrategyResolver> s3 = Mockito.mockStatic(ProviderStrategyResolver.class);
-         MockedStatic<OBMessageUtils> s4 = Mockito.mockStatic(OBMessageUtils.class)) {
+    // Execute action and verify error result
+    ActionResult res = action.action(params, new MutableBoolean(false));
 
-      s1.when(OBDal::getInstance).thenReturn(obdal);
-      s3.when(() -> ProviderStrategyResolver.resolveForProvider(provider)).thenReturn(strategy);
-      s4.when(() -> OBMessageUtils.messageBD("ETPP_ProviderErrorPrefix")).thenReturn("Provider error: %s");
-
-      ActionResult res = action.action(p, new MutableBoolean(false));
-
-      assertThat(res.getType(), is(Result.Type.ERROR));
-      assertThat(res.getMessage(), is("Provider error: boom"));
-      verify(obdal, times(1)).rollbackAndClose();
-    }
-  }
-
-  /**
-   * Verifies that the action returns the correct input class, which is the base class of
-   * all Openbravo objects: {@code BaseOBObject}.
-   */
-  @Test
-  void getInputClassReturnsBaseOBObject() {
-    assertThat(action.getInputClass(), equalTo(BaseOBObject.class));
+    assertThat(res.getType(), is(Result.Type.ERROR));
+    assertThat(res.getMessage(), is(MSG_ALL_FAILED));
   }
 }

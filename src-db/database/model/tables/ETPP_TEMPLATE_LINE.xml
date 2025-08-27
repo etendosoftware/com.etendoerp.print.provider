@@ -58,6 +58,10 @@
       <foreign-key foreignTable="ETPP_TEMPLATE" name="ETPP_TEMPLATELINE_TEMPLATE_FK">
         <reference local="ETPP_TEMPLATE_ID" foreign="ETPP_TEMPLATE_ID"/>
       </foreign-key>
+      <index name="ETPP_TEMPLATE_LINE_DFL_CHECK" unique="true">
+        <index-column name="ETPP_TEMPLATE_ID"/>
+        <whereClause><![CDATA[ISDEFAULT='Y']]></whereClause>
+      </index>
       <index name="ETPP_TEMPLATELINE_TEMPLATE_IDX" unique="false">
         <index-column name="ETPP_TEMPLATE_ID"/>
       </index>
