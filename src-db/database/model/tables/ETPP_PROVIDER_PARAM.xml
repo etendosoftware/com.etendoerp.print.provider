@@ -41,7 +41,7 @@
         <default/>
         <onCreateDefault/>
       </column>
-      <column name="PARAM_CONTENT" primaryKey="false" required="true" type="VARCHAR" size="2000" autoIncrement="false">
+      <column name="PARAM_CONTENT" primaryKey="false" required="false" type="VARCHAR" size="2000" autoIncrement="false">
         <default/>
         <onCreateDefault/>
       </column>

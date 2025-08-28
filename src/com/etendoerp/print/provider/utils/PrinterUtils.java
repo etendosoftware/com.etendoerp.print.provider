@@ -1,16 +1,22 @@
 package com.etendoerp.print.provider.utils;
 
+import java.io.File;
+
+import javax.servlet.ServletContext;
+
 import org.apache.commons.lang3.StringUtils;
 import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONObject;
 import org.hibernate.criterion.Order;
 import org.hibernate.criterion.Restrictions;
 import org.openbravo.base.exception.OBException;
+import org.openbravo.dal.core.DalContextListener;
 import org.openbravo.dal.service.OBCriteria;
 import org.openbravo.dal.service.OBDal;
 import org.openbravo.erpCommon.utility.OBMessageUtils;
 import org.openbravo.model.ad.datamodel.Table;
 
+import com.etendoerp.print.provider.api.PrintProviderException;
 import com.etendoerp.print.provider.data.Printer;
 import com.etendoerp.print.provider.data.Provider;
 import com.etendoerp.print.provider.data.ProviderParam;
@@ -18,6 +24,11 @@ import com.etendoerp.print.provider.data.Template;
 import com.etendoerp.print.provider.data.TemplateLine;
 import com.smf.jobs.ActionResult;
 import com.smf.jobs.Result;
+
+import net.sf.jasperreports.engine.JRException;
+import net.sf.jasperreports.engine.JasperCompileManager;
+import net.sf.jasperreports.engine.JasperReport;
+import net.sf.jasperreports.engine.util.JRLoader;
 
 /**
  * Utility holder for well-known parameter names, i18n helpers and common DAL lookups
@@ -40,6 +51,11 @@ public class PrinterUtils {
   public static final String RECORDS = "recordIds";
   public static final String PRINTERS = "Printers";
   public static final String NUMBER_OF_COPIES = "numberofcopies";
+  public static final String PRINTERS_URL = "printersurl";
+  public static final String API_KEY = "apikey";
+  public static final String PRINTJOB_URL = "printjoburl";
+
+  private static final String TOKEN_BASEDESIGN = "@basedesign@";
 
   // Message keys
   public static final String MISSING_PARAMETER_MSG = "ETPP_MissingParameter";
@@ -74,7 +90,7 @@ public class PrinterUtils {
   public static Printer requirePrinter(final String printerId) {
     final Printer printer = OBDal.getInstance().get(Printer.class, printerId);
     if (printer == null) {
-      throw new OBException(String.format(OBMessageUtils.getI18NMessage("ETPP_PrinterNotFound"), printerId));
+      throw new OBException(String.format(OBMessageUtils.getI18NMessage("ETPP_PrinterNotFoundById"), printerId));
     }
     return printer;
   }
@@ -253,5 +269,155 @@ public class PrinterUtils {
     res.setType(Result.Type.WARNING);
     res.setMessage(detail);
     return res;
+  }
+
+  /**
+   * Resolves the given TemplateLine's template location to a File by:
+   * <ol>
+   *   <li>checking if the template location is a plain path (relative to the
+   *       src-loc/design/ directory)</li>
+   *   <li>checking if the template location is a path of the form
+   *       @<module>@/... (relative to the src - loc / design / < module > / directory)</ li>
+   *   <li>checking if the template location is a path of the form
+   *       @basedesign@/... (relative to the src - loc / design / directory)</ li>
+   * </ol>
+   *
+   * <p>If none of the above applies, throws an OBException.</p>
+   *
+   * @param templateLine
+   *     the TemplateLine containing the template location to resolve
+   * @return the File representing the resolved template location
+   * @throws PrintProviderException
+   *     if the template location is invalid or cannot be resolved
+   */
+  public static File resolveTemplateFile(TemplateLine templateLine) throws PrintProviderException {
+    if (templateLine == null || StringUtils.isBlank(templateLine.getTemplateLocation())) {
+      throw new OBException(OBMessageUtils.getI18NMessage("ETPP_EmptyTemplateLocation"));
+    }
+
+    final String tokenPath = templateLine.getTemplateLocation();
+    final ServletContext servletContext = DalContextListener.getServletContext();
+    final String raw = tokenPath.trim();
+
+    // Case 1: @basedesign@
+    if (raw.regionMatches(true, 0, TOKEN_BASEDESIGN, 0, TOKEN_BASEDESIGN.length())) {
+      String rel = stripLeadingSlash(raw.substring(TOKEN_BASEDESIGN.length()));
+      return trySrcLocThenWeb(servletContext, rel);
+    }
+
+    // Case 2: @<module>@/...
+    if (raw.startsWith("@")) {
+      int second = raw.indexOf('@', 1);
+      if (second > 1) {
+        String module = raw.substring(1, second);
+        String rest = stripLeadingSlash(raw.substring(second + 1));
+        String rel = module + "/" + rest;
+        return trySrcLocThenWeb(servletContext, rel);
+      }
+    }
+
+    return trySrcLocThenWeb(servletContext, stripLeadingSlash(raw));
+  }
+
+  /**
+   * Attempts to resolve the given relative path first in the src-loc/design/
+   * directory and then in the web/ directory. If the file exists in either
+   * location, it is returned as a File. Otherwise, a PrintProviderException is
+   * thrown with a message indicating the two paths that were tried.
+   *
+   * @param sc
+   *     the ServletContext to use for resolving the paths
+   * @param rel
+   *     the relative path to resolve
+   * @return the resolved File if it exists, or throws a PrintProviderException
+   * @throws PrintProviderException
+   *     if the file does not exist in either location
+   */
+  private static File trySrcLocThenWeb(ServletContext sc, String rel)
+      throws PrintProviderException {
+
+    String srcLocPath = "src-loc/design/" + rel;
+    String absSrcLocPath = sc.getRealPath(srcLocPath);
+    if (absSrcLocPath != null) {
+      File srcLocFile = new File(absSrcLocPath);
+      if (srcLocFile.exists()) return srcLocFile;
+    }
+
+    String webPath = "web/" + rel;
+    String absWebPath = sc.getRealPath(webPath);
+    if (absWebPath != null) {
+      File webFile = new File(absWebPath);
+      if (webFile.exists()) return webFile;
+    }
+
+    throw new PrintProviderException(String.format(OBMessageUtils.getI18NMessage("ETPP_TemplateNotFound"),
+        (absSrcLocPath == null ? srcLocPath : absSrcLocPath), (absWebPath == null ? webPath : absWebPath)));
+  }
+
+  /**
+   * If the given path begins with a slash, returns a new String with the
+   * leading slash removed. Otherwise, returns the original String.
+   *
+   * @param path
+   *     the input path
+   * @return the path without a leading slash
+   */
+  private static String stripLeadingSlash(String path) {
+    if (path == null) return null;
+    return path.startsWith("/") ? path.substring(1) : path;
+  }
+
+  /**
+   * Loads a JasperReport from the given absolute path. If the path ends with
+   * ".jrxml", it is compiled into a JasperReport first. If the path ends with
+   * ".jasper", the report is loaded directly. If the path has some other
+   * extension, a PrintProviderException is thrown.
+   *
+   * @param absPath
+   *     the absolute path to the Jasper report to load
+   * @param jrFile
+   *     the File representing the report. This is used only if the path
+   *     ends with ".jasper".
+   * @return the loaded or compiled JasperReport
+   * @throws PrintProviderException
+   *     if the report has an unsupported extension or if there is an
+   *     error loading or compiling the report
+   */
+  public static JasperReport loadOrCompileJasperReport(String absPath, File jrFile)
+      throws PrintProviderException {
+    try {
+      if (absPath.toLowerCase().endsWith(".jrxml")) {
+        return JasperCompileManager.compileReport(absPath);
+      } else if (absPath.toLowerCase().endsWith(".jasper")) {
+        return (JasperReport) JRLoader.loadObject(jrFile);
+      } else {
+        throw new PrintProviderException(
+            String.format(OBMessageUtils.getI18NMessage("ETPP_UnsupportedTemplateExtension"), absPath));
+      }
+    } catch (JRException e) {
+      throw new PrintProviderException(
+          String.format(OBMessageUtils.getI18NMessage("ETPP_ErrorLoadingOrCompilingJasper"), absPath), e);
+    }
+  }
+
+  /**
+   * Ensures the {@link ProviderParam#getParamContent()} of the given
+   * {@link ProviderParam} is not blank. If it is, throws an
+   * {@link PrintProviderException} with a message indicating the parameter
+   * key.
+   *
+   * @param providerParam
+   *     the parameter to check
+   * @param paramKey
+   *     the key of the parameter to check (used for error message)
+   * @throws PrintProviderException
+   *     if the parameter's content is blank
+   */
+  public static void providerParamContentCheck(final ProviderParam providerParam,
+      final String paramKey) throws PrintProviderException {
+    if (StringUtils.isBlank(providerParam.getParamContent())) {
+      throw new OBException(
+          String.format(OBMessageUtils.messageBD("ETPP_ProviderParameterWithoutContent"), paramKey));
+    }
   }
 }
