@@ -99,7 +99,7 @@ class SendGeneratedLabelToPrinterTest {
         .thenReturn(MSG_MISSING_PARAM);
     sMsgStatic.when(() -> OBMessageUtils.getI18NMessage(PrinterUtils.PROVIDER_NOT_FOUND_MSG))
         .thenReturn(MSG_PROVIDER_NOT_FOUND);
-    sMsgStatic.when(() -> OBMessageUtils.getI18NMessage("ETPP_PrinterNotFound"))
+    sMsgStatic.when(() -> OBMessageUtils.getI18NMessage("ETPP_PrinterNotFoundById"))
         .thenReturn(MSG_PRINTER_NOT_FOUND_FMT);
     sMsgStatic.when(() -> OBMessageUtils.getI18NMessage("ETPP_TableNotFound"))
         .thenReturn(MSG_TABLE_NOT_FOUND_FMT);
@@ -114,7 +114,7 @@ class SendGeneratedLabelToPrinterTest {
           Object[] args = inv.getArgument(1, Object[].class);
           return "Missing parameter: " + (args != null && args.length > 0 ? args[0] : "%s");
         });
-    sMsgStatic.when(() -> OBMessageUtils.getI18NMessage(eq("ETPP_PrinterNotFound"), Mockito.any()))
+    sMsgStatic.when(() -> OBMessageUtils.getI18NMessage(eq("ETPP_PrinterNotFoundById"), Mockito.any()))
         .thenAnswer(inv -> "Printer " + inv.getArgument(1, Object[].class)[0] + " not found");
     sMsgStatic.when(() -> OBMessageUtils.getI18NMessage(eq("ETPP_TableNotFound"), Mockito.any()))
         .thenAnswer(inv -> "Table " + inv.getArgument(1, Object[].class)[0] + " not found");
