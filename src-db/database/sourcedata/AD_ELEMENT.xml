@@ -214,8 +214,8 @@ The chosen record determines:
 <!--F8EB0533D3C04151B823F714B6858187-->  <AD_ORG_ID><![CDATA[0]]></AD_ORG_ID>
 <!--F8EB0533D3C04151B823F714B6858187-->  <ISACTIVE><![CDATA[Y]]></ISACTIVE>
 <!--F8EB0533D3C04151B823F714B6858187-->  <COLUMNNAME><![CDATA[Refreshprinters]]></COLUMNNAME>
-<!--F8EB0533D3C04151B823F714B6858187-->  <NAME><![CDATA[Refreshprinters]]></NAME>
-<!--F8EB0533D3C04151B823F714B6858187-->  <PRINTNAME><![CDATA[Refreshprinters]]></PRINTNAME>
+<!--F8EB0533D3C04151B823F714B6858187-->  <NAME><![CDATA[Refresh Printers]]></NAME>
+<!--F8EB0533D3C04151B823F714B6858187-->  <PRINTNAME><![CDATA[Refresh Printers]]></PRINTNAME>
 <!--F8EB0533D3C04151B823F714B6858187-->  <DESCRIPTION><![CDATA[Refreshes the printer list from the selected Print Provider.]]></DESCRIPTION>
 <!--F8EB0533D3C04151B823F714B6858187-->  <HELP><![CDATA[Click Refresh Printers to synchronise Etendo with the external middleware (e.g., PrintNode, CUPS gateway) configured in Print Providers. The system will:
 	1.	Use the provider’s Printers GET URL and API Key.
