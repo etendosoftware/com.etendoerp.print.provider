@@ -65,6 +65,11 @@
       <index name="ETPP_PRINTER_PROVIDER_IDX" unique="false">
         <index-column name="ETPP_PROVIDER_ID"/>
       </index>
+      <index name="ETPP_PRINTER_UNIQUE_DEFAULT" unique="true">
+        <index-column name="AD_ORG_ID"/>
+        <index-column name="AD_CLIENT_ID"/>
+        <whereClause><![CDATA[ISDEFAULT='Y']]></whereClause>
+      </index>
       <check name="ETPP_PRINTER_DEFAULT_CHK"><![CDATA[ISDEFAULT IN ('Y', 'N')]]></check>
       <check name="ETPP_PRINTER_ISACTIVE_CHK"><![CDATA[ISACTIVE IN ('Y', 'N')]]></check>
     </table>
