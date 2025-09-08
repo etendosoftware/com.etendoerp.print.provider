@@ -49,7 +49,7 @@
         <default/>
         <onCreateDefault/>
       </column>
-      <foreign-key foreignTable="ETPP_PROVIDER" name="ETPP_PROVIDER_PM_FK_PROVIDER">
+      <foreign-key foreignTable="ETPP_PROVIDER" name="ETPP_PROVIDER_PM_FK_PROVIDER" onDelete="cascade">
         <reference local="ETPP_PROVIDER_ID" foreign="ETPP_PROVIDER_ID"/>
       </foreign-key>
       <unique name="ETPP_PROVIDER_PM_VALUE">
