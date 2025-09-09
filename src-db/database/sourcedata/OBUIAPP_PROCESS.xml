@@ -5,8 +5,8 @@
 <!--5E3A7C9C576A48E5BF84F2E2B3155D7A-->  <AD_CLIENT_ID><![CDATA[0]]></AD_CLIENT_ID>
 <!--5E3A7C9C576A48E5BF84F2E2B3155D7A-->  <AD_ORG_ID><![CDATA[0]]></AD_ORG_ID>
 <!--5E3A7C9C576A48E5BF84F2E2B3155D7A-->  <ISACTIVE><![CDATA[Y]]></ISACTIVE>
-<!--5E3A7C9C576A48E5BF84F2E2B3155D7A-->  <VALUE><![CDATA[ETPP_SendGeneratedLabelToPrinter]]></VALUE>
-<!--5E3A7C9C576A48E5BF84F2E2B3155D7A-->  <NAME><![CDATA[Send Generated Label To Printer]]></NAME>
+<!--5E3A7C9C576A48E5BF84F2E2B3155D7A-->  <VALUE><![CDATA[ETPP_SendPrintJob]]></VALUE>
+<!--5E3A7C9C576A48E5BF84F2E2B3155D7A-->  <NAME><![CDATA[Send Print Job]]></NAME>
 <!--5E3A7C9C576A48E5BF84F2E2B3155D7A-->  <DESCRIPTION><![CDATA[Sends a label to print for the current record through the selected Print Provider. The button opens a popup to choose Provider and (optionally) Printer; the process resolves the template, renders the label, and submits the job.]]></DESCRIPTION>
 <!--5E3A7C9C576A48E5BF84F2E2B3155D7A-->  <HELP><![CDATA[In the popup:
 -Provider (required): pick a provider configured in Print Providers.

@@ -55,7 +55,7 @@
       <foreign-key foreignTable="AD_CLIENT" name="ETPP_TEMPLATELINE_ADCLIENT_FK">
         <reference local="AD_CLIENT_ID" foreign="AD_CLIENT_ID"/>
       </foreign-key>
-      <foreign-key foreignTable="ETPP_TEMPLATE" name="ETPP_TEMPLATELINE_TEMPLATE_FK">
+      <foreign-key foreignTable="ETPP_TEMPLATE" name="ETPP_TEMPLATELINE_TEMPLATE_FK" onDelete="cascade">
         <reference local="ETPP_TEMPLATE_ID" foreign="ETPP_TEMPLATE_ID"/>
       </foreign-key>
       <index name="ETPP_TEMPLATE_LINE_DFL_CHECK" unique="true">
