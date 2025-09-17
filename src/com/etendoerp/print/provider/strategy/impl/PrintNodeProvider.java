@@ -22,7 +22,7 @@ import org.openbravo.model.ad.datamodel.Table;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.etendoerp.advanced.warehouse.management.utils.PrintProviderUtils;
+import com.etendoerp.print.provider.utils.PrintProviderUtils;
 import com.etendoerp.print.provider.api.PrintProviderException;
 import com.etendoerp.print.provider.api.PrinterDTO;
 import com.etendoerp.print.provider.data.Printer;

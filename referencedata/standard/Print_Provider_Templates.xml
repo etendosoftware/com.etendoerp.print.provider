@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?><ob:Openbravo xmlns:ob="http://www.openbravo.com" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" defaultValues="true">
+  <ETPP_Template_line id="D2B90709B91B438D9BFF39FAC0323AD5" identifier="@basedesign@/com/etendoerp/advanced/warehouse/management/reports/labels/PNProductLabel.jrxml - 10">
+    <id>D2B90709B91B438D9BFF39FAC0323AD5</id>
+    <active>true</active>
+    <template id="CBF1493D67EF476E8825A064F1D56F4A" entity-name="ETPP_Template" identifier="Barcode label for product"/>
+    <templateLocation>@basedesign@/com/etendoerp/advanced/warehouse/management/reports/labels/PNProductLabel.jrxml</templateLocation>
+    <default>true</default>
+    <lineNo>10</lineNo>
+  </ETPP_Template_line>
+  <ETPP_Template id="CBF1493D67EF476E8825A064F1D56F4A" identifier="Barcode label for product">
+    <id>CBF1493D67EF476E8825A064F1D56F4A</id>
+    <active>true</active>
+    <table id="208" entity-name="ADTable" identifier="M_Product"/>
+    <name>Barcode label for product</name>
+  </ETPP_Template>
+</ob:Openbravo>
