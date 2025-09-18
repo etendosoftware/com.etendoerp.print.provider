@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
@@ -61,6 +62,19 @@ import net.sf.jasperreports.engine.util.JRLoader;
  */
 @ExtendWith(MockitoExtension.class)
 class PrinterUtilsTest {
+  private static final String PROVIDER_NOT_FOUND = "Provider not found";
+  private static final String EMPTY_TEMPLATE_LOCATION = "Empty template location";
+  private static final String MESSAGE_SHOULD_INCLUDE_KEY = "Message should include the missing key";
+  private static final String MISSING_PARAMETER = "Missing parameter: %s";
+  private static final String REPORTS_MY_LABEL_JASPER = "reports/my-label.jasper";
+  private static final String SRC_LOC_DESIGN = "src-loc/design/";
+  private static final String FOO_BAR = "foo/bar";
+  private static final String API_KEY = "API_KEY";
+  private static final String PRINTERS_URL = "PRINTERS_URL";
+  private static final String PARAM = "param";
+  private static final String ITEMS = "items";
+  private static final String COPIES = "copies";
+  private static final String JASPER_EXT = ".jasper";
   private MockedStatic<OBMessageUtils> obMsgStatic;
 
   @Mock
@@ -153,7 +167,7 @@ class PrinterUtilsTest {
     String providerId = "MISSING-999";
 
     obMsgStatic.when(() -> OBMessageUtils.getI18NMessage(org.mockito.ArgumentMatchers.anyString())).thenReturn(
-        "Provider not found");
+        PROVIDER_NOT_FOUND);
 
     try (MockedStatic<OBDal> obDalStatic = mockStatic(OBDal.class)) {
       obDalStatic.when(OBDal::getInstance).thenReturn(obDal);
@@ -161,7 +175,7 @@ class PrinterUtilsTest {
       when(obDal.get(Provider.class, providerId)).thenReturn(null);
 
       OBException ex = assertThrows(OBException.class, () -> PrinterUtils.requireProvider(providerId));
-      assertTrue(ex.getMessage().contains("Provider not found"));
+      assertTrue(ex.getMessage().contains(PROVIDER_NOT_FOUND));
     }
   }
 
@@ -277,44 +291,17 @@ class PrinterUtilsTest {
    */
   @Test
   void resolveTemplateLineForWhenFoundReturnsBestTemplateLine() {
-    try (MockedStatic<OBDal> obDalStatic = mockStatic(OBDal.class)) {
-      obDalStatic.when(OBDal::getInstance).thenReturn(obDal);
-
-      @SuppressWarnings("unchecked") OBCriteria<Template> templateCrit = mock(OBCriteria.class);
-      when(obDal.createCriteria(Template.class)).thenReturn(templateCrit);
-      when(templateCrit.add(any(Criterion.class))).thenReturn(templateCrit);
-      when(templateCrit.uniqueResult()).thenReturn(template);
-
-      @SuppressWarnings("unchecked") OBCriteria<TemplateLine> lineCrit = mock(OBCriteria.class);
-      when(obDal.createCriteria(TemplateLine.class)).thenReturn(lineCrit);
-      when(lineCrit.add(any(Criterion.class))).thenReturn(lineCrit);
-      when(lineCrit.addOrder(any(Order.class))).thenReturn(lineCrit);
-      when(lineCrit.uniqueResult()).thenReturn(templateLine);
-
+    try (MockedStatic<OBDal> obDalStatic = mockResolveTemplateCriteria(template, templateLine)) {
       assertSame(templateLine, PrinterUtils.resolveTemplateLineFor(table));
     }
   }
 
   /**
-   * Ensures resolveTemplateLineFor returns null when Template exists but no TemplateLine is found.
+   * Ensures resolveTemplateLineFor returns null when Template exists, but no TemplateLine is found.
    */
   @Test
   void resolveTemplateLineForWhenNoTemplateLineReturnsNull() {
-    try (MockedStatic<OBDal> obDalStatic = mockStatic(OBDal.class)) {
-      obDalStatic.when(OBDal::getInstance).thenReturn(obDal);
-
-      @SuppressWarnings("unchecked") OBCriteria<Template> templateCrit = mock(OBCriteria.class);
-      when(obDal.createCriteria(Template.class)).thenReturn(templateCrit);
-      when(templateCrit.add(any(Criterion.class))).thenReturn(templateCrit);
-      when(templateCrit.uniqueResult()).thenReturn(template);
-
-      @SuppressWarnings("unchecked") OBCriteria<TemplateLine> lineCrit = mock(OBCriteria.class);
-
-      when(obDal.createCriteria(TemplateLine.class)).thenReturn(lineCrit);
-      when(lineCrit.add(any(Criterion.class))).thenReturn(lineCrit);
-      when(lineCrit.addOrder(any(Order.class))).thenReturn(lineCrit);
-      when(lineCrit.uniqueResult()).thenReturn(null);
-
+    try (MockedStatic<OBDal> obDalStatic = mockResolveTemplateCriteria(template, null)) {
       assertNull(PrinterUtils.resolveTemplateLineFor(table));
     }
   }
@@ -324,10 +311,10 @@ class PrinterUtilsTest {
    */
   @Test
   void getRequiredParamWhenProviderNullThrowsOBException() {
-    obMsgStatic.when(() -> OBMessageUtils.getI18NMessage(anyString())).thenReturn("Provider not found");
+    obMsgStatic.when(() -> OBMessageUtils.getI18NMessage(anyString())).thenReturn(PROVIDER_NOT_FOUND);
 
-    OBException ex = assertThrows(OBException.class, () -> PrinterUtils.getRequiredParam(null, "API_KEY"));
-    assertTrue(ex.getMessage().contains("Provider not found"));
+    OBException ex = assertThrows(OBException.class, () -> PrinterUtils.getRequiredParam(null, API_KEY));
+    assertTrue(ex.getMessage().contains(PROVIDER_NOT_FOUND));
   }
 
   /**
@@ -336,7 +323,7 @@ class PrinterUtilsTest {
    */
   @Test
   void getRequiredParamWhenParamKeyBlankThrowsOBException() {
-    obMsgStatic.when(() -> OBMessageUtils.getI18NMessage(anyString())).thenReturn("Missing parameter: %s");
+    obMsgStatic.when(() -> OBMessageUtils.getI18NMessage(anyString())).thenReturn(MISSING_PARAMETER);
 
     OBException ex = assertThrows(OBException.class, () -> PrinterUtils.getRequiredParam(provider, ""));
     assertTrue(ex.getMessage().contains("paramKey"));
@@ -357,7 +344,7 @@ class PrinterUtilsTest {
       when(criteria.add(any(Criterion.class))).thenReturn(criteria);
       when(criteria.uniqueResult()).thenReturn(providerParam);
 
-      ProviderParam result = PrinterUtils.getRequiredParam(provider, "API_KEY");
+      ProviderParam result = PrinterUtils.getRequiredParam(provider, API_KEY);
       assertSame(providerParam, result);
     }
   }
@@ -380,9 +367,9 @@ class PrinterUtilsTest {
       when(criteria.add(any(Criterion.class))).thenReturn(criteria);
       when(criteria.uniqueResult()).thenReturn(null);
 
-      OBException ex = assertThrows(OBException.class, () -> PrinterUtils.getRequiredParam(provider, "PRINTERS_URL"));
+      OBException ex = assertThrows(OBException.class, () -> PrinterUtils.getRequiredParam(provider, PRINTERS_URL));
 
-      assertTrue(ex.getMessage().contains("PRINTERS_URL"));
+      assertTrue(ex.getMessage().contains(PRINTERS_URL));
     }
   }
 
@@ -392,13 +379,13 @@ class PrinterUtilsTest {
   @Test
   void requireParamWhenKeyMissingThrowsOBException() {
     JSONObject json = new JSONObject();
-    String key = "param";
+    String key = PARAM;
 
     obMsgStatic.when(() -> OBMessageUtils.getI18NMessage(org.mockito.ArgumentMatchers.anyString())).thenReturn(
-        "Missing parameter: %s");
+        MISSING_PARAMETER);
 
     OBException ex = assertThrows(OBException.class, () -> PrinterUtils.requireParam(json, key));
-    assertTrue(ex.getMessage().contains(key), "Message should include the missing key");
+    assertTrue(ex.getMessage().contains(key), MESSAGE_SHOULD_INCLUDE_KEY);
   }
 
   /**
@@ -406,11 +393,11 @@ class PrinterUtilsTest {
    */
   @Test
   void requireParamWhenValueEmptyThrowsOBException() throws Exception {
-    JSONObject json = new JSONObject().put("param", "");
-    String key = "param";
+    JSONObject json = new JSONObject().put(PARAM, "");
+    String key = PARAM;
 
     obMsgStatic.when(() -> OBMessageUtils.getI18NMessage(org.mockito.ArgumentMatchers.anyString())).thenReturn(
-        "Missing parameter: %s");
+        MISSING_PARAMETER);
 
     OBException ex = assertThrows(OBException.class, () -> PrinterUtils.requireParam(json, key));
     assertTrue(ex.getMessage().contains(key));
@@ -421,9 +408,9 @@ class PrinterUtilsTest {
    */
   @Test
   void requireParamWhenValuePresentReturnsIt() throws Exception {
-    JSONObject json = new JSONObject().put("param", "value-123");
+    JSONObject json = new JSONObject().put(PARAM, "value-123");
 
-    assertEquals("value-123", PrinterUtils.requireParam(json, "param"));
+    assertEquals("value-123", PrinterUtils.requireParam(json, PARAM));
   }
 
   /**
@@ -432,13 +419,13 @@ class PrinterUtilsTest {
   @Test
   void requireJSONArrayWhenKeyMissingThrowsOBException() {
     JSONObject json = new JSONObject();
-    String key = "items";
+    String key = ITEMS;
 
     obMsgStatic.when(() -> OBMessageUtils.getI18NMessage(org.mockito.ArgumentMatchers.anyString())).thenReturn(
-        "Missing parameter: %s");
+        MISSING_PARAMETER);
 
     OBException ex = assertThrows(OBException.class, () -> PrinterUtils.requireJSONArray(json, key));
-    assertTrue(ex.getMessage().contains(key), "Message should include the missing key");
+    assertTrue(ex.getMessage().contains(key), MESSAGE_SHOULD_INCLUDE_KEY);
   }
 
   /**
@@ -446,11 +433,11 @@ class PrinterUtilsTest {
    */
   @Test
   void requireJSONArrayWhenValueIsNotArrayThrowsOBException() throws Exception {
-    JSONObject json = new JSONObject().put("items", "not-an-array");
-    String key = "items";
+    JSONObject json = new JSONObject().put(ITEMS, "not-an-array");
+    String key = ITEMS;
 
     obMsgStatic.when(() -> OBMessageUtils.getI18NMessage(org.mockito.ArgumentMatchers.anyString())).thenReturn(
-        "Missing parameter: %s");
+        MISSING_PARAMETER);
 
     OBException ex = assertThrows(OBException.class, () -> PrinterUtils.requireJSONArray(json, key));
     assertTrue(ex.getMessage().contains(key));
@@ -461,11 +448,11 @@ class PrinterUtilsTest {
    */
   @Test
   void requireJSONArrayWhenEmptyArrayThrowsOBException() throws Exception {
-    JSONObject json = new JSONObject().put("items", new JSONArray());
-    String key = "items";
+    JSONObject json = new JSONObject().put(ITEMS, new JSONArray());
+    String key = ITEMS;
 
     obMsgStatic.when(() -> OBMessageUtils.getI18NMessage(org.mockito.ArgumentMatchers.anyString())).thenReturn(
-        "Missing parameter: %s");
+        MISSING_PARAMETER);
 
     OBException ex = assertThrows(OBException.class, () -> PrinterUtils.requireJSONArray(json, key));
     assertTrue(ex.getMessage().contains(key));
@@ -477,9 +464,9 @@ class PrinterUtilsTest {
   @Test
   void requireJSONArrayWhenNonEmptyReturnsArray() throws Exception {
     JSONArray arr = new JSONArray().put(1).put(2);
-    JSONObject json = new JSONObject().put("items", arr);
+    JSONObject json = new JSONObject().put(ITEMS, arr);
 
-    JSONArray result = PrinterUtils.requireJSONArray(json, "items");
+    JSONArray result = PrinterUtils.requireJSONArray(json, ITEMS);
     assertSame(arr, result, "Should return the same JSONArray instance stored in the JSON");
     assertEquals(2, result.length());
   }
@@ -491,13 +478,13 @@ class PrinterUtilsTest {
   @Test
   void requirePositiveIntWhenKeyMissingThrowsOBException() {
     JSONObject json = new JSONObject();
-    String key = "copies";
+    String key = COPIES;
 
     obMsgStatic.when(() -> OBMessageUtils.getI18NMessage(org.mockito.ArgumentMatchers.anyString())).thenReturn(
-        "Missing parameter: %s");
+        MISSING_PARAMETER);
 
     OBException ex = assertThrows(OBException.class, () -> PrinterUtils.requirePositiveInt(json, key));
-    assertTrue(ex.getMessage().contains(key), "Message should include the missing key");
+    assertTrue(ex.getMessage().contains(key), MESSAGE_SHOULD_INCLUDE_KEY);
   }
 
   /**
@@ -506,12 +493,12 @@ class PrinterUtilsTest {
    */
   @Test
   void requirePositiveIntWhenValueIsZeroThrowsOBException() throws Exception {
-    JSONObject json = new JSONObject().put("copies", 0);
+    JSONObject json = new JSONObject().put(COPIES, 0);
 
     obMsgStatic.when(() -> OBMessageUtils.getI18NMessage("ETPP_NumberOfCopiesInvalid")).thenReturn(
         "Invalid copies: %s");
 
-    OBException ex = assertThrows(OBException.class, () -> PrinterUtils.requirePositiveInt(json, "copies"));
+    OBException ex = assertThrows(OBException.class, () -> PrinterUtils.requirePositiveInt(json, COPIES));
     assertTrue(ex.getMessage().contains("0"), "Message should include the invalid number");
   }
 
@@ -521,12 +508,12 @@ class PrinterUtilsTest {
    */
   @Test
   void requirePositiveIntWhenValueIsNegativeThrowsOBException() throws Exception {
-    JSONObject json = new JSONObject().put("copies", -5);
+    JSONObject json = new JSONObject().put(COPIES, -5);
 
     obMsgStatic.when(() -> OBMessageUtils.getI18NMessage("ETPP_NumberOfCopiesInvalid")).thenReturn(
         "Invalid copies: %s");
 
-    OBException ex = assertThrows(OBException.class, () -> PrinterUtils.requirePositiveInt(json, "copies"));
+    OBException ex = assertThrows(OBException.class, () -> PrinterUtils.requirePositiveInt(json, COPIES));
     assertTrue(ex.getMessage().contains("-5"), "Message should include the invalid number");
   }
 
@@ -535,9 +522,9 @@ class PrinterUtilsTest {
    */
   @Test
   void requirePositiveIntWhenValueIsPositiveReturnsIt() throws Exception {
-    JSONObject json = new JSONObject().put("copies", 3);
+    JSONObject json = new JSONObject().put(COPIES, 3);
 
-    assertEquals(3, PrinterUtils.requirePositiveInt(json, "copies"));
+    assertEquals(3, PrinterUtils.requirePositiveInt(json, COPIES));
   }
 
   /**
@@ -598,10 +585,10 @@ class PrinterUtilsTest {
   @Test
   void resolveTemplateFileWhenTemplateLineNullThrowsOBException() {
     obMsgStatic.when(() -> OBMessageUtils.getI18NMessage("ETPP_EmptyTemplateLocation")).thenReturn(
-        "Empty template location");
+        EMPTY_TEMPLATE_LOCATION);
 
     OBException ex = assertThrows(OBException.class, () -> PrinterUtils.resolveTemplateFile(null));
-    assertTrue(ex.getMessage().contains("Empty template location"));
+    assertTrue(ex.getMessage().contains(EMPTY_TEMPLATE_LOCATION));
   }
 
   /**
@@ -610,12 +597,12 @@ class PrinterUtilsTest {
   @Test
   void resolveTemplateFileWhenLocationBlankThrowsOBException() {
     obMsgStatic.when(() -> OBMessageUtils.getI18NMessage("ETPP_EmptyTemplateLocation")).thenReturn(
-        "Empty template location");
+        EMPTY_TEMPLATE_LOCATION);
 
     when(templateLine.getTemplateLocation()).thenReturn("");
 
     OBException ex = assertThrows(OBException.class, () -> PrinterUtils.resolveTemplateFile(templateLine));
-    assertTrue(ex.getMessage().contains("Empty template location"));
+    assertTrue(ex.getMessage().contains(EMPTY_TEMPLATE_LOCATION));
   }
 
   /**
@@ -626,7 +613,7 @@ class PrinterUtilsTest {
   void resolveTemplateFileWhenBasedesignTokenResolvesViaSrcOrWeb() throws Exception {
     when(templateLine.getTemplateLocation()).thenReturn("@BASEDESIGN@/reports/my-label.jasper");
 
-    File returned = File.createTempFile("tpl", ".jasper");
+    File returned = File.createTempFile("tpl", JASPER_EXT);
     returned.deleteOnExit();
 
     try (MockedStatic<DalContextListener> dl = mockStatic(
@@ -636,7 +623,7 @@ class PrinterUtilsTest {
 
       pu.when(() -> PrinterUtils.resolveTemplateFile(any(TemplateLine.class))).thenCallRealMethod();
       pu.when(() -> PrinterUtils.stripLeadingSlash(anyString())).thenCallRealMethod();
-      pu.when(() -> PrinterUtils.trySrcLocThenWeb(eq(servletContext), eq("reports/my-label.jasper"))).thenReturn(
+      pu.when(() -> PrinterUtils.trySrcLocThenWeb(eq(servletContext), eq(REPORTS_MY_LABEL_JASPER))).thenReturn(
           returned);
 
       File out = PrinterUtils.resolveTemplateFile(templateLine);
@@ -644,7 +631,7 @@ class PrinterUtilsTest {
       assertNotNull(out);
       assertEquals(returned.getAbsolutePath(), out.getAbsolutePath());
 
-      pu.verify(() -> PrinterUtils.trySrcLocThenWeb(servletContext, "reports/my-label.jasper"));
+      pu.verify(() -> PrinterUtils.trySrcLocThenWeb(servletContext, REPORTS_MY_LABEL_JASPER));
     }
   }
 
@@ -655,7 +642,7 @@ class PrinterUtilsTest {
   void resolveTemplateFileWhenModuleTokenResolvesViaSrcOrWeb() throws Exception {
     when(templateLine.getTemplateLocation()).thenReturn("@my.module@/sub/path/file.jasper");
 
-    File returned = File.createTempFile("tpl", ".jasper");
+    File returned = File.createTempFile("tpl", JASPER_EXT);
     returned.deleteOnExit();
 
     try (MockedStatic<DalContextListener> dl = mockStatic(
@@ -685,7 +672,7 @@ class PrinterUtilsTest {
   void resolveTemplateFileWhenPlainPathResolvesViaSrcOrWeb() throws Exception {
     when(templateLine.getTemplateLocation()).thenReturn("/plain/reports/out.jasper");
 
-    File returned = File.createTempFile("tpl", ".jasper");
+    File returned = File.createTempFile("tpl", JASPER_EXT);
     returned.deleteOnExit();
 
     try (MockedStatic<DalContextListener> dl = mockStatic(
@@ -712,11 +699,11 @@ class PrinterUtilsTest {
    */
   @Test
   void trySrcLocThenWebWhenSrcLocExistsReturnsSrcLocFile() throws Exception {
-    String rel = "reports/my-label.jasper";
+    String rel = REPORTS_MY_LABEL_JASPER;
     File srcLocFile = File.createTempFile("srcLoc-", ".tmp");
     srcLocFile.deleteOnExit();
 
-    when(servletContext.getRealPath("src-loc/design/" + rel)).thenReturn(srcLocFile.getAbsolutePath());
+    when(servletContext.getRealPath(SRC_LOC_DESIGN + rel)).thenReturn(srcLocFile.getAbsolutePath());
 
     File result = PrinterUtils.trySrcLocThenWeb(servletContext, rel);
 
@@ -732,7 +719,7 @@ class PrinterUtilsTest {
     String rel = "reports/another-label.jasper";
 
     File missing = new File("definitely-missing-" + System.nanoTime() + ".tmp");
-    when(servletContext.getRealPath("src-loc/design/" + rel)).thenReturn(missing.getAbsolutePath());
+    when(servletContext.getRealPath(SRC_LOC_DESIGN + rel)).thenReturn(missing.getAbsolutePath());
 
     File webFile = File.createTempFile("web-", ".tmp");
     webFile.deleteOnExit();
@@ -752,7 +739,7 @@ class PrinterUtilsTest {
   void trySrcLocThenWebWhenNeitherExistsThrowsPrintProviderException() {
     String rel = "reports/missing.jasper";
 
-    when(servletContext.getRealPath("src-loc/design/" + rel)).thenReturn(null);
+    when(servletContext.getRealPath(SRC_LOC_DESIGN + rel)).thenReturn(null);
     when(servletContext.getRealPath("web/" + rel)).thenReturn(null);
 
     obMsgStatic.when(() -> OBMessageUtils.getI18NMessage("ETPP_TemplateNotFound")).thenReturn(
@@ -763,7 +750,7 @@ class PrinterUtilsTest {
 
     String msg = ex.getMessage();
     assertNotNull(msg);
-    assertTrue(msg.contains("src-loc/design/" + rel), "Message should include src-loc candidate path");
+    assertTrue(msg.contains(SRC_LOC_DESIGN + rel), "Message should include src-loc candidate path");
     assertTrue(msg.contains("web/" + rel), "Message should include web candidate path");
   }
 
@@ -780,7 +767,7 @@ class PrinterUtilsTest {
    */
   @Test
   void stripLeadingSlashWhenStartsWithSlashStripsOne() {
-    assertEquals("foo/bar", PrinterUtils.stripLeadingSlash("/foo/bar"));
+    assertEquals(FOO_BAR, PrinterUtils.stripLeadingSlash("/foo/bar"));
   }
 
   /**
@@ -788,7 +775,7 @@ class PrinterUtilsTest {
    */
   @Test
   void stripLeadingSlashWhenNoLeadingSlashReturnsSame() {
-    assertEquals("foo/bar", PrinterUtils.stripLeadingSlash("foo/bar"));
+    assertEquals(FOO_BAR, PrinterUtils.stripLeadingSlash(FOO_BAR));
   }
 
   /**
@@ -829,7 +816,7 @@ class PrinterUtilsTest {
   @Test
   void loadOrCompileJasperReportWhenJasperLoadsReport() throws Exception {
     String absPath = "/tmp/sample.jasper";
-    File jrFile = File.createTempFile("tpl", ".jasper");
+    File jrFile = File.createTempFile("tpl", JASPER_EXT);
     jrFile.deleteOnExit();
 
     try (MockedStatic<JRLoader> jrl = mockStatic(JRLoader.class)) {
@@ -885,7 +872,7 @@ class PrinterUtilsTest {
   @Test
   void loadOrCompileJasperReportWhenLoadFailsWrapsIntoPrintProviderException() throws Exception {
     String absPath = "/tmp/sample.jasper";
-    File jrFile = File.createTempFile("tpl", ".jasper");
+    File jrFile = File.createTempFile("tpl", JASPER_EXT);
     jrFile.deleteOnExit();
 
     obMsgStatic.when(() -> OBMessageUtils.getI18NMessage("ETPP_ErrorLoadingOrCompilingJasper")).thenReturn("Error: %s");
@@ -906,8 +893,8 @@ class PrinterUtilsTest {
   @Test
   void providerParamContentCheckWhenContentNullThrowsOBException() {
     OBException ex = assertThrows(OBException.class,
-        () -> PrinterUtils.providerParamContentCheck(providerParam, "API_KEY"));
-    assertTrue(ex.getMessage().contains("API_KEY"));
+        () -> PrinterUtils.providerParamContentCheck(providerParam, API_KEY));
+    assertTrue(ex.getMessage().contains(API_KEY));
   }
 
   /**
@@ -918,8 +905,8 @@ class PrinterUtilsTest {
     when(providerParam.getParamContent()).thenReturn("");
 
     OBException ex = assertThrows(OBException.class,
-        () -> PrinterUtils.providerParamContentCheck(providerParam, "PRINTERS_URL"));
-    assertTrue(ex.getMessage().contains("PRINTERS_URL"));
+        () -> PrinterUtils.providerParamContentCheck(providerParam, PRINTERS_URL));
+    assertTrue(ex.getMessage().contains(PRINTERS_URL));
   }
 
   /**
@@ -942,5 +929,34 @@ class PrinterUtilsTest {
     when(providerParam.getParamContent()).thenReturn("some-value");
 
     assertDoesNotThrow(() -> PrinterUtils.providerParamContentCheck(providerParam, "ANY_KEY"));
+  }
+
+  /**
+   * Sets up minimal OBDal/criteria mocks used by {@code resolveTemplateLineFor(table)}.
+   *
+   * @param template
+   *     Template to return from Template criteria (or {@code null})
+   * @param lineToReturn
+   *     TemplateLine to return from TemplateLine criteria (or {@code null})
+   * @return active {@link MockedStatic} for {@link OBDal} that the caller must close
+   */
+  private MockedStatic<OBDal> mockResolveTemplateCriteria(Template template, TemplateLine lineToReturn) {
+    MockedStatic<OBDal> obDalStatic = mockStatic(OBDal.class);
+    obDalStatic.when(OBDal::getInstance).thenReturn(obDal);
+
+    @SuppressWarnings("unchecked") OBCriteria<Template> templateCrit = mock(OBCriteria.class);
+    when(obDal.createCriteria(Template.class)).thenReturn(templateCrit);
+    when(templateCrit.add(any(org.hibernate.criterion.Criterion.class))).thenReturn(templateCrit);
+    when(templateCrit.setMaxResults(anyInt())).thenReturn(templateCrit);
+    when(templateCrit.uniqueResult()).thenReturn(template);
+
+    @SuppressWarnings("unchecked") OBCriteria<TemplateLine> lineCrit = mock(OBCriteria.class);
+    when(obDal.createCriteria(TemplateLine.class)).thenReturn(lineCrit);
+    when(lineCrit.add(any(org.hibernate.criterion.Criterion.class))).thenReturn(lineCrit);
+    when(lineCrit.addOrder(any(org.hibernate.criterion.Order.class))).thenReturn(lineCrit);
+    when(lineCrit.setMaxResults(anyInt())).thenReturn(lineCrit);
+    when(lineCrit.uniqueResult()).thenReturn(lineToReturn);
+
+    return obDalStatic;
   }
 }
