@@ -247,7 +247,7 @@ public class PrintNodeProvider extends PrintProviderStrategy {
    *     If there is an error in the inputs (e.g. the provider or printer is not
    *     found, or the file does not exist)
    */
-  private static void validatePrintJobInputs(Provider provider, Printer printer, File labelFile)
+  public static void validatePrintJobInputs(Provider provider, Printer printer, File labelFile)
       throws PrintProviderException {
     if (provider == null) {
       throw new PrintProviderException(OBMessageUtils.messageBD("ETPP_ProviderNotFound"));
@@ -270,7 +270,7 @@ public class PrintNodeProvider extends PrintProviderStrategy {
    * @throws PrintProviderException
    *     if the external ID could not be parsed as an integer
    */
-  private static int parseExternalPrinterId(String externalId) throws PrintProviderException {
+  public static int parseExternalPrinterId(String externalId) throws PrintProviderException {
     try {
       return Integer.parseInt(externalId);
     } catch (NumberFormatException nfe) {
@@ -291,7 +291,7 @@ public class PrintNodeProvider extends PrintProviderStrategy {
    * @throws JSONException
    *     if there is an error building the JSON object
    */
-  private static JSONObject buildPrintJobBody(int printerId, int copies, String base64) throws JSONException {
+  public static JSONObject buildPrintJobBody(int printerId, int copies, String base64) throws JSONException {
     final String title = String.format(OBMessageUtils.getI18NMessage("ETAWIM_EtendoPrintNodeLabel"),
         System.currentTimeMillis());
     final JSONObject options = new JSONObject().put("copies", copies);
@@ -313,7 +313,7 @@ public class PrintNodeProvider extends PrintProviderStrategy {
    * @throws JSONException
    *     if the JSON string is not valid
    */
-  private static List<PrinterDTO> parsePrinters(final String body) throws JSONException {
+  public static List<PrinterDTO> parsePrinters(final String body) throws JSONException {
     final JSONArray arr = new JSONArray(body);
     final List<PrinterDTO> result = new ArrayList<>(arr.length());
 
@@ -345,7 +345,7 @@ public class PrintNodeProvider extends PrintProviderStrategy {
    * @return The truncated string, or {@code null} if the given string is
    *     {@code null}.
    */
-  private static String truncate(final String s, final int max) {
+  public static String truncate(final String s, final int max) {
     if (s == null) return null;
     return s.length() <= max ? s : s.substring(0, max) + "...";
   }

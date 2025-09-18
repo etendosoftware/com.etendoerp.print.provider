@@ -38,7 +38,7 @@ import net.sf.jasperreports.engine.util.JRLoader;
  */
 public class PrinterUtils {
 
-  private PrinterUtils() {
+  protected PrinterUtils() {
     throw new UnsupportedOperationException("Utility class");
   }
 
@@ -333,7 +333,7 @@ public class PrinterUtils {
    * @throws PrintProviderException
    *     if the file does not exist in either location
    */
-  private static File trySrcLocThenWeb(ServletContext sc, String rel)
+  protected static File trySrcLocThenWeb(ServletContext sc, String rel)
       throws PrintProviderException {
 
     String srcLocPath = "src-loc/design/" + rel;
@@ -362,7 +362,7 @@ public class PrinterUtils {
    *     the input path
    * @return the path without a leading slash
    */
-  private static String stripLeadingSlash(String path) {
+  protected static String stripLeadingSlash(String path) {
     if (path == null) return null;
     return path.startsWith("/") ? path.substring(1) : path;
   }

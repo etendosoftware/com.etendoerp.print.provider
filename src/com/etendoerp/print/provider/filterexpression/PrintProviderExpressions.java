@@ -24,7 +24,7 @@ import com.etendoerp.print.provider.utils.PrinterUtils;
  * {@link PrinterUtils#PRINTERS} parameters.</p>
  */
 public class PrintProviderExpressions implements FilterExpression {
-  private static final Logger log = LogManager.getLogger();
+  protected static final Logger log = LogManager.getLogger();
 
   /**
    * @return a default value for the parameter given in the request map.
@@ -82,13 +82,13 @@ public class PrintProviderExpressions implements FilterExpression {
    * @return the ID of the default provider to use for print jobs, or an empty
    *     string if no provider is present
    */
-  private String getDefaultProviderForPrintJob() {
+  protected String getDefaultProviderForPrintJob() {
     OBCriteria<Provider> providerOBCriteria = OBDal.getInstance().createCriteria(Provider.class);
     providerOBCriteria.addOrder(Order.asc(Provider.PROPERTY_NAME));
     providerOBCriteria.setMaxResults(1);
 
     Provider provider = (Provider) providerOBCriteria.uniqueResult();
-    return provider == null ? "" : provider.getId();
+    return provider == null ? StringUtils.EMPTY : provider.getId();
   }
 
   /**
@@ -105,10 +105,10 @@ public class PrintProviderExpressions implements FilterExpression {
    *
    * @return the ID of the default printer to use for print jobs, an empty string if none is found.
    */
-  private String getDefaultPrinterForPrintJob() {
+  protected String getDefaultPrinterForPrintJob() {
     Provider provider = OBDal.getInstance().get(Provider.class, getDefaultProviderForPrintJob());
     if (provider == null) {
-      return "";
+      return StringUtils.EMPTY;
     }
 
     OBCriteria<Printer> printerOBCriteria = OBDal.getInstance().createCriteria(Printer.class);
@@ -119,6 +119,6 @@ public class PrintProviderExpressions implements FilterExpression {
 
     Printer printerResult = (Printer) printerOBCriteria.uniqueResult();
 
-    return printerResult == null ? "" : printerResult.getId();
+    return printerResult == null ? StringUtils.EMPTY : printerResult.getId();
   }
 }
