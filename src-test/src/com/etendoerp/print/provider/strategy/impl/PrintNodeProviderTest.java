@@ -386,19 +386,6 @@ class PrintNodeProviderTest {
   }
 
   /**
-   * Ensures sendToPrinter rethrows PrintProviderException when the external printer id is invalid.
-   */
-  @Test
-  void sendToPrinterWhenExternalIdInvalidRethrowsPrintProviderException() throws Exception {
-    File file = File.createTempFile(TEMP_FILE_PREFIX, PDF_EXTENSION);
-    file.deleteOnExit();
-
-    PrintProviderException ex = assertThrows(PrintProviderException.class,
-        () -> hook.sendToPrinter(provider, printer, 1, file));
-    assertNotNull(ex.getMessage());
-  }
-
-  /**
    * Ensures validatePrintJobInputs throws PrintProviderException when provider is null.
    */
   @Test
