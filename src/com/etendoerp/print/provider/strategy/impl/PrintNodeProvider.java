@@ -90,10 +90,10 @@ public class PrintNodeProvider extends PrintProviderStrategy {
       final HttpRequest req = PrintProviderUtils.buildJsonGet(
           printersUrl.getParamContent(), basicAuth, REQUEST_TIMEOUT_SECONDS);
 
-      final HttpResponse<String> resp = PrintProviderUtils.send(client, req, "ETAWIM_InterruptedSendException");
+      final HttpResponse<String> resp = PrintProviderUtils.send(client, req, "ETPP_InterruptedSendException");
 
       if (resp.statusCode() < 200 || resp.statusCode() >= 300) {
-        throw new OBException(String.format(OBMessageUtils.getI18NMessage("ETAWIM_FetchJobError"), resp.statusCode(),
+        throw new OBException(String.format(OBMessageUtils.getI18NMessage("ETPP_FetchJobError"), resp.statusCode(),
             truncate(resp.body(), 500)));
       }
       return parsePrinters(resp.body());
@@ -216,11 +216,11 @@ public class PrintNodeProvider extends PrintProviderStrategy {
       final HttpRequest req = PrintProviderUtils.buildJsonPost(
           printJobUrl.getParamContent(), basicAuth, REQUEST_TIMEOUT_SECONDS, body.toString());
 
-      final HttpResponse<String> resp = PrintProviderUtils.send(client, req, "ETAWIM_InterruptedSendException");
+      final HttpResponse<String> resp = PrintProviderUtils.send(client, req, "ETPP_InterruptedSendException");
 
       if (resp.statusCode() < 200 || resp.statusCode() >= 300) {
         throw new OBException(String.format(
-            OBMessageUtils.getI18NMessage("ETAWIM_PrintJobError"), resp.statusCode(),
+            OBMessageUtils.getI18NMessage("ETPP_PrintJobError"), resp.statusCode(),
             PrintProviderUtils.truncate(resp.body(), 500)));
       }
 
@@ -292,7 +292,7 @@ public class PrintNodeProvider extends PrintProviderStrategy {
    *     if there is an error building the JSON object
    */
   public static JSONObject buildPrintJobBody(int printerId, int copies, String base64) throws JSONException {
-    final String title = String.format(OBMessageUtils.getI18NMessage("ETAWIM_EtendoPrintNodeLabel"),
+    final String title = String.format(OBMessageUtils.getI18NMessage("ETPP_EtendoPrintNodeLabel"),
         System.currentTimeMillis());
     final JSONObject options = new JSONObject().put("copies", copies);
     return new JSONObject()
@@ -320,7 +320,7 @@ public class PrintNodeProvider extends PrintProviderStrategy {
     for (int i = 0; i < arr.length(); i++) {
       final JSONObject jsonPrinter = arr.getJSONObject(i);
       final String id = String.valueOf(jsonPrinter.opt("id"));
-      final String name = jsonPrinter.optString("name", OBMessageUtils.getI18NMessage("ETAWIM_UnnamedPrinter"));
+      final String name = jsonPrinter.optString("name", OBMessageUtils.getI18NMessage("ETPP_UnnamedPrinter"));
       final boolean isDefault = jsonPrinter.optBoolean("default", jsonPrinter.optBoolean("is_default", false));
       result.add(new PrinterDTO(id, name, isDefault));
     }

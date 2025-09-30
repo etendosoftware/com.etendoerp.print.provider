@@ -121,8 +121,8 @@ class PrintNodeProviderTest {
 
     obMsgStatic = mockStatic(OBMessageUtils.class);
     lenient().when(OBMessageUtils.messageBD(anyString())).thenAnswer(inv -> "%s %s %s");
-    lenient().when(OBMessageUtils.getI18NMessage("ETAWIM_UnnamedPrinter")).thenReturn(UNNAMED);
-    lenient().when(OBMessageUtils.getI18NMessage("ETAWIM_EtendoPrintNodeLabel")).thenReturn("Label %s");
+    lenient().when(OBMessageUtils.getI18NMessage("ETPP_UnnamedPrinter")).thenReturn(UNNAMED);
+    lenient().when(OBMessageUtils.getI18NMessage("ETPP_EtendoPrintNodeLabel")).thenReturn("Label %s");
   }
 
   /**
@@ -192,7 +192,7 @@ class PrintNodeProviderTest {
 
   /**
    * Ensures fetchPrinters wraps non-2xx HTTP responses into a PrintProviderException
-   * with a formatted message using OBMessageUtils.getI18NMessage("ETAWIM_FetchJobError").
+   * with a formatted message using OBMessageUtils.getI18NMessage("ETPP_FetchJobError").
    */
   @Test
   void fetchPrintersWhenResponseNot2xxThrowsPrintProviderException() throws Exception {
@@ -204,7 +204,7 @@ class PrintNodeProviderTest {
     when(httpResponse.statusCode()).thenReturn(401);
     when(httpResponse.body()).thenReturn("Unauthorized");
 
-    obMsgStatic.when(() -> OBMessageUtils.getI18NMessage("ETAWIM_FetchJobError")).thenReturn(
+    obMsgStatic.when(() -> OBMessageUtils.getI18NMessage("ETPP_FetchJobError")).thenReturn(
         "Fetch job error: %s - %s");
 
     try (MockedStatic<PrinterUtils> pu = mockStatic(
@@ -358,7 +358,7 @@ class PrintNodeProviderTest {
     when(httpResponse.statusCode()).thenReturn(400);
     when(httpResponse.body()).thenReturn("Bad Request");
 
-    obMsgStatic.when(() -> OBMessageUtils.getI18NMessage("ETAWIM_PrintJobError")).thenReturn(
+    obMsgStatic.when(() -> OBMessageUtils.getI18NMessage("ETPP_PrintJobError")).thenReturn(
         "Print job error: %s - %s");
 
     try (MockedStatic<PrinterUtils> pu = mockStatic(
