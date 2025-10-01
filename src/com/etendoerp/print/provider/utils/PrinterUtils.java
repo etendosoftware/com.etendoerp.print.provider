@@ -431,7 +431,7 @@ public class PrinterUtils {
    */
   public static void providerParamContentCheck(final ProviderParam providerParam,
       final String paramKey) throws PrintProviderException {
-    if (StringUtils.isBlank(providerParam.getParamContent())) {
+    if (providerParam == null || StringUtils.isBlank(providerParam.getParamContent())) {
       throw new OBException(
           String.format(OBMessageUtils.messageBD("ETPP_ProviderParameterWithoutContent"), paramKey));
     }

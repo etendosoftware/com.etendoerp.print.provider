@@ -89,6 +89,7 @@ public class ProviderStrategyResolver {
    *     the Provider instance for which the strategy needs to be resolved
    * @return the resolved PrintProviderStrategy implementation
    */
+  @SuppressWarnings("java:S112")
   public static PrintProviderStrategy resolveForProvider(Provider provider) {
     try {
       ProvidersImplementation impl = provider.getProviderImplementation();
