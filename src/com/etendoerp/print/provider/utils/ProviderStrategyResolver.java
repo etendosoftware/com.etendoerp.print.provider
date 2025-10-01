@@ -109,7 +109,7 @@ public class ProviderStrategyResolver {
 
     } catch (Exception e) {
       log.error(e.getMessage());
-      throw new PrintProviderException("Error resolving PrintProviderStrategy", e);
+      throw new PrintProviderException(OBMessageUtils.messageBD("ETPP_ProviderResolveError"), e);
     }
   }
 
