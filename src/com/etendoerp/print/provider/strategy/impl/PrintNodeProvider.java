@@ -148,6 +148,7 @@ public class PrintNodeProvider extends PrintProviderStrategy {
    *     If there is an error generating the label
    */
   @Override
+  @SuppressWarnings("java:S5443")
   public File generateLabel(final Provider provider,
       final Table table,
       final String recordId,

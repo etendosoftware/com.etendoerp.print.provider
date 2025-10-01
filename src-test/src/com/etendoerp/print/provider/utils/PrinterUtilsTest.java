@@ -70,6 +70,7 @@ import net.sf.jasperreports.engine.util.JRLoader;
  * Uses MockitoExtension to enable Mockito mocks for dependencies and static methods.
  */
 @ExtendWith(MockitoExtension.class)
+@SuppressWarnings("java:S5443")
 class PrinterUtilsTest {
   private static final String PROVIDER_NOT_FOUND = "Provider not found";
   private static final String EMPTY_TEMPLATE_LOCATION = "Empty template location";

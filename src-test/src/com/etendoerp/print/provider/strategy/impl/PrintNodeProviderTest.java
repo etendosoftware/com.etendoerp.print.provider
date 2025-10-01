@@ -73,6 +73,7 @@ import net.sf.jasperreports.engine.JasperReport;
  * Uses MockitoExtension to enable Mockito mocks for dependencies and static methods.
  */
 @ExtendWith(MockitoExtension.class)
+@SuppressWarnings("java:S5443")
 class PrintNodeProviderTest {
 
   private static final String BASIC_ABC = "Basic abc";
