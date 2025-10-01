@@ -24,14 +24,11 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 import java.io.File;
@@ -40,8 +37,6 @@ import java.lang.reflect.Modifier;
 
 import javax.servlet.ServletContext;
 
-import org.codehaus.jettison.json.JSONArray;
-import org.codehaus.jettison.json.JSONObject;
 import org.hibernate.criterion.Criterion;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -64,7 +59,6 @@ import com.etendoerp.print.provider.data.ProviderParam;
 import com.etendoerp.print.provider.data.Template;
 import com.etendoerp.print.provider.data.TemplateLine;
 import com.smf.jobs.ActionResult;
-import com.smf.jobs.Result;
 
 import net.sf.jasperreports.engine.JRException;
 import net.sf.jasperreports.engine.JasperCompileManager;
@@ -79,18 +73,16 @@ import net.sf.jasperreports.engine.util.JRLoader;
 class PrinterUtilsTest {
   private static final String PROVIDER_NOT_FOUND = "Provider not found";
   private static final String EMPTY_TEMPLATE_LOCATION = "Empty template location";
-  private static final String MESSAGE_SHOULD_INCLUDE_KEY = "Message should include the missing key";
   private static final String MISSING_PARAMETER = "Missing parameter: %s";
   private static final String REPORTS_MY_LABEL_JASPER = "reports/my-label.jasper";
   private static final String SRC_LOC_DESIGN = "src-loc/design/";
   private static final String FOO_BAR = "foo/bar";
   private static final String API_KEY = "API_KEY";
   private static final String PRINTERS_URL = "PRINTERS_URL";
-  private static final String PARAM = "param";
-  private static final String ITEMS = "items";
-  private static final String COPIES = "copies";
   private static final String JASPER_EXT = ".jasper";
   private static final String SAMPLE_JRXML_PATH = "/tmp/sample.jrxml";
+  private static final String SAMPLE_JASPER_PATH = "/tmp/sample.jasper";
+
   private MockedStatic<OBMessageUtils> obMsgStatic;
 
   @Mock
@@ -156,170 +148,6 @@ class PrinterUtilsTest {
   void constructorIsProtected() throws Exception {
     Constructor<PrinterUtils> ctor = PrinterUtils.class.getDeclaredConstructor();
     assertTrue(Modifier.isProtected(ctor.getModifiers()), "Constructor should be protected");
-  }
-
-  /**
-   * Ensures requireProvider returns the Provider when it exists for the given id.
-   */
-  @Test
-  void requireProviderWhenFoundReturnsProvider() {
-    String providerId = "PROV-123";
-
-    try (MockedStatic<OBDal> obDalStatic = mockStatic(OBDal.class)) {
-      obDalStatic.when(OBDal::getInstance).thenReturn(obDal);
-
-      when(obDal.get(Provider.class, providerId)).thenReturn(provider);
-
-      assertSame(provider, PrinterUtils.requireProvider(providerId));
-    }
-  }
-
-  /**
-   * Ensures requireProvider throws OBException when no Provider exists for the given id.
-   * Verifies the error message comes from OBMessageUtils using the expected key.
-   */
-  @Test
-  void requireProviderWhenNotFoundThrowsOBException() {
-    String providerId = "MISSING-999";
-
-    obMsgStatic.when(() -> OBMessageUtils.getI18NMessage(org.mockito.ArgumentMatchers.anyString())).thenReturn(
-        PROVIDER_NOT_FOUND);
-
-    try (MockedStatic<OBDal> obDalStatic = mockStatic(OBDal.class)) {
-      obDalStatic.when(OBDal::getInstance).thenReturn(obDal);
-
-      when(obDal.get(Provider.class, providerId)).thenReturn(null);
-
-      OBException ex = assertThrows(OBException.class, () -> PrinterUtils.requireProvider(providerId));
-      assertTrue(ex.getMessage().contains(PROVIDER_NOT_FOUND));
-    }
-  }
-
-  /**
-   * Ensures requirePrinter returns the Printer when it exists for the given id.
-   */
-  @Test
-  void requirePrinterWhenFoundReturnsPrinter() {
-    String printerId = "PRN-123";
-
-    try (MockedStatic<OBDal> obDalStatic = mockStatic(OBDal.class)) {
-      obDalStatic.when(OBDal::getInstance).thenReturn(obDal);
-
-      when(obDal.get(Printer.class, printerId)).thenReturn(printer);
-
-      assertSame(printer, PrinterUtils.requirePrinter(printerId));
-    }
-  }
-
-  /**
-   * Ensures requirePrinter throws OBException when no Printer exists for the given id.
-   * Verifies the formatted message includes the requested printer id.
-   */
-  @Test
-  void requirePrinterWhenNotFoundThrowsOBException() {
-    String printerId = "MISSING-999";
-
-    obMsgStatic.when(() -> OBMessageUtils.getI18NMessage("ETPP_PrinterNotFoundById")).thenReturn(
-        "Printer not found: %s");
-
-    try (MockedStatic<OBDal> obDalStatic = mockStatic(OBDal.class)) {
-      obDalStatic.when(OBDal::getInstance).thenReturn(obDal);
-
-      when(obDal.get(Printer.class, printerId)).thenReturn(null);
-
-      OBException ex = assertThrows(OBException.class, () -> PrinterUtils.requirePrinter(printerId));
-      assertTrue(ex.getMessage().contains(printerId));
-    }
-  }
-
-  /**
-   * Ensures requireTableByName returns the Table when it exists.
-   */
-  @Test
-  void requireTableByNameWhenFoundReturnsTable() {
-    String entityName = "C_Order";
-
-    try (MockedStatic<OBDal> obDalStatic = mockStatic(OBDal.class)) {
-      obDalStatic.when(OBDal::getInstance).thenReturn(obDal);
-
-      @SuppressWarnings("unchecked") OBCriteria<Table> criteria = mock(OBCriteria.class);
-      when(obDal.createCriteria(Table.class)).thenReturn(criteria);
-      when(criteria.add(any(org.hibernate.criterion.Criterion.class))).thenReturn(criteria);
-
-      when(criteria.uniqueResult()).thenReturn(table);
-
-      assertSame(table, PrinterUtils.requireTableByName(entityName));
-    }
-  }
-
-  /**
-   * Ensures requireTableByName throws OBException when no Table is found for the given name.
-   * Verifies the formatted message includes the entity name.
-   */
-  @Test
-  void requireTableByNameWhenNotFoundThrowsOBException() {
-    String entityName = "NonExistingTable";
-
-    obMsgStatic.when(() -> OBMessageUtils.getI18NMessage("ETPP_TableNotFound")).thenReturn("Table not found: %s");
-
-    try (MockedStatic<OBDal> obDalStatic = mockStatic(OBDal.class)) {
-      obDalStatic.when(OBDal::getInstance).thenReturn(obDal);
-
-      @SuppressWarnings("unchecked") OBCriteria<Table> criteria = mock(OBCriteria.class);
-      when(obDal.createCriteria(Table.class)).thenReturn(criteria);
-      when(criteria.add(any(org.hibernate.criterion.Criterion.class))).thenReturn(criteria);
-      when(criteria.uniqueResult()).thenReturn(null);
-
-      OBException ex = assertThrows(OBException.class, () -> PrinterUtils.requireTableByName(entityName));
-
-      assertTrue(ex.getMessage().contains(entityName));
-    }
-  }
-
-  /**
-   * Ensures resolveTemplateLineFor throws OBException when no Template exists for the given table.
-   * Verifies the message contains the table name.
-   */
-  @Test
-  void resolveTemplateLineForWhenTemplateNotFoundThrowsOBException() {
-    obMsgStatic.when(() -> OBMessageUtils.getI18NMessage("ETPP_PrintLocationNotFound")).thenReturn(
-        "Print location not found for table: %s");
-
-    when(table.getName()).thenReturn("Order");
-
-    try (MockedStatic<OBDal> obDalStatic = mockStatic(OBDal.class)) {
-      obDalStatic.when(OBDal::getInstance).thenReturn(obDal);
-
-      @SuppressWarnings("unchecked") OBCriteria<Template> templateCrit = mock(OBCriteria.class);
-      when(obDal.createCriteria(Template.class)).thenReturn(templateCrit);
-
-      when(templateCrit.add(any(Criterion.class))).thenReturn(templateCrit);
-      when(templateCrit.uniqueResult()).thenReturn(null);
-
-      OBException ex = assertThrows(OBException.class, () -> PrinterUtils.resolveTemplateLineFor(table));
-      assertTrue(ex.getMessage().contains("Order"));
-    }
-  }
-
-  /**
-   * Ensures resolveTemplateLineFor returns the first TemplateLine when Template exists.
-   * Mocks both criteria: Template and TemplateLine.
-   */
-  @Test
-  void resolveTemplateLineForWhenFoundReturnsBestTemplateLine() {
-    try (MockedStatic<OBDal> obDalStatic = mockResolveTemplateCriteria(template, templateLine)) {
-      assertSame(templateLine, PrinterUtils.resolveTemplateLineFor(table));
-    }
-  }
-
-  /**
-   * Ensures resolveTemplateLineFor returns null when Template exists, but no TemplateLine is found.
-   */
-  @Test
-  void resolveTemplateLineForWhenNoTemplateLineReturnsNull() {
-    try (MockedStatic<OBDal> obDalStatic = mockResolveTemplateCriteria(template, null)) {
-      assertNull(PrinterUtils.resolveTemplateLineFor(table));
-    }
   }
 
   /**
@@ -389,211 +217,6 @@ class PrinterUtilsTest {
     }
   }
 
-  /**
-   * Ensures requireParam throws OBException when the key is missing in the JSON.
-   */
-  @Test
-  void requireParamWhenKeyMissingThrowsOBException() {
-    JSONObject json = new JSONObject();
-    String key = PARAM;
-
-    obMsgStatic.when(() -> OBMessageUtils.getI18NMessage(org.mockito.ArgumentMatchers.anyString())).thenReturn(
-        MISSING_PARAMETER);
-
-    OBException ex = assertThrows(OBException.class, () -> PrinterUtils.requireParam(json, key));
-    assertTrue(ex.getMessage().contains(key), MESSAGE_SHOULD_INCLUDE_KEY);
-  }
-
-  /**
-   * Ensures requireParam throws OBException when the value is an empty string.
-   */
-  @Test
-  void requireParamWhenValueEmptyThrowsOBException() throws Exception {
-    JSONObject json = new JSONObject().put(PARAM, "");
-    String key = PARAM;
-
-    obMsgStatic.when(() -> OBMessageUtils.getI18NMessage(org.mockito.ArgumentMatchers.anyString())).thenReturn(
-        MISSING_PARAMETER);
-
-    OBException ex = assertThrows(OBException.class, () -> PrinterUtils.requireParam(json, key));
-    assertTrue(ex.getMessage().contains(key));
-  }
-
-  /**
-   * Ensures requireParam returns the non-blank value when present.
-   */
-  @Test
-  void requireParamWhenValuePresentReturnsIt() throws Exception {
-    JSONObject json = new JSONObject().put(PARAM, "value-123");
-
-    assertEquals("value-123", PrinterUtils.requireParam(json, PARAM));
-  }
-
-  /**
-   * Ensures requireJSONArray throws OBException when the key is missing in the JSON.
-   */
-  @Test
-  void requireJSONArrayWhenKeyMissingThrowsOBException() {
-    JSONObject json = new JSONObject();
-    String key = ITEMS;
-
-    obMsgStatic.when(() -> OBMessageUtils.getI18NMessage(org.mockito.ArgumentMatchers.anyString())).thenReturn(
-        MISSING_PARAMETER);
-
-    OBException ex = assertThrows(OBException.class, () -> PrinterUtils.requireJSONArray(json, key));
-    assertTrue(ex.getMessage().contains(key), MESSAGE_SHOULD_INCLUDE_KEY);
-  }
-
-  /**
-   * Ensures requireJSONArray throws OBException when the key exists but is not an array.
-   */
-  @Test
-  void requireJSONArrayWhenValueIsNotArrayThrowsOBException() throws Exception {
-    JSONObject json = new JSONObject().put(ITEMS, "not-an-array");
-    String key = ITEMS;
-
-    obMsgStatic.when(() -> OBMessageUtils.getI18NMessage(org.mockito.ArgumentMatchers.anyString())).thenReturn(
-        MISSING_PARAMETER);
-
-    OBException ex = assertThrows(OBException.class, () -> PrinterUtils.requireJSONArray(json, key));
-    assertTrue(ex.getMessage().contains(key));
-  }
-
-  /**
-   * Ensures requireJSONArray throws OBException when the array is empty.
-   */
-  @Test
-  void requireJSONArrayWhenEmptyArrayThrowsOBException() throws Exception {
-    JSONObject json = new JSONObject().put(ITEMS, new JSONArray());
-    String key = ITEMS;
-
-    obMsgStatic.when(() -> OBMessageUtils.getI18NMessage(org.mockito.ArgumentMatchers.anyString())).thenReturn(
-        MISSING_PARAMETER);
-
-    OBException ex = assertThrows(OBException.class, () -> PrinterUtils.requireJSONArray(json, key));
-    assertTrue(ex.getMessage().contains(key));
-  }
-
-  /**
-   * Ensures requireJSONArray returns the non-empty array when present.
-   */
-  @Test
-  void requireJSONArrayWhenNonEmptyReturnsArray() throws Exception {
-    JSONArray arr = new JSONArray().put(1).put(2);
-    JSONObject json = new JSONObject().put(ITEMS, arr);
-
-    JSONArray result = PrinterUtils.requireJSONArray(json, ITEMS);
-    assertSame(arr, result, "Should return the same JSONArray instance stored in the JSON");
-    assertEquals(2, result.length());
-  }
-
-  /**
-   * Ensures requirePositiveInt throws OBException when the key is missing in the JSON.
-   * Verifies the formatted message includes the missing key.
-   */
-  @Test
-  void requirePositiveIntWhenKeyMissingThrowsOBException() {
-    JSONObject json = new JSONObject();
-    String key = COPIES;
-
-    obMsgStatic.when(() -> OBMessageUtils.getI18NMessage(org.mockito.ArgumentMatchers.anyString())).thenReturn(
-        MISSING_PARAMETER);
-
-    OBException ex = assertThrows(OBException.class, () -> PrinterUtils.requirePositiveInt(json, key));
-    assertTrue(ex.getMessage().contains(key), MESSAGE_SHOULD_INCLUDE_KEY);
-  }
-
-  /**
-   * Ensures requirePositiveInt throws OBException when the value is zero.
-   * Verifies the formatted message includes the invalid number.
-   */
-  @Test
-  void requirePositiveIntWhenValueIsZeroThrowsOBException() throws Exception {
-    JSONObject json = new JSONObject().put(COPIES, 0);
-
-    obMsgStatic.when(() -> OBMessageUtils.getI18NMessage("ETPP_NumberOfCopiesInvalid")).thenReturn(
-        "Invalid copies: %s");
-
-    OBException ex = assertThrows(OBException.class, () -> PrinterUtils.requirePositiveInt(json, COPIES));
-    assertTrue(ex.getMessage().contains("0"), "Message should include the invalid number");
-  }
-
-  /**
-   * Ensures requirePositiveInt throws OBException when the value is negative.
-   * Verifies the formatted message includes the invalid number.
-   */
-  @Test
-  void requirePositiveIntWhenValueIsNegativeThrowsOBException() throws Exception {
-    JSONObject json = new JSONObject().put(COPIES, -5);
-
-    obMsgStatic.when(() -> OBMessageUtils.getI18NMessage("ETPP_NumberOfCopiesInvalid")).thenReturn(
-        "Invalid copies: %s");
-
-    OBException ex = assertThrows(OBException.class, () -> PrinterUtils.requirePositiveInt(json, COPIES));
-    assertTrue(ex.getMessage().contains("-5"), "Message should include the invalid number");
-  }
-
-  /**
-   * Ensures requirePositiveInt returns the positive integer when present and valid.
-   */
-  @Test
-  void requirePositiveIntWhenValueIsPositiveReturnsIt() throws Exception {
-    JSONObject json = new JSONObject().put(COPIES, 3);
-
-    assertEquals(3, PrinterUtils.requirePositiveInt(json, COPIES));
-  }
-
-  /**
-   * Ensures fail sets the result type to ERROR, assigns the given detail as a message,
-   * and returns the same ActionResult instance.
-   */
-  @Test
-  void failSetsErrorTypeAndMessageReturnsSameInstance() {
-    assertSame(actionResult, PrinterUtils.fail(actionResult, "Something went wrong"),
-        "fail should return the same ActionResult instance");
-    verify(actionResult).setType(Result.Type.ERROR);
-    verify(actionResult).setMessage("Something went wrong");
-    verifyNoMoreInteractions(actionResult);
-  }
-
-  /**
-   * Ensures fail accepts a null detail and still sets the ERROR type
-   * while passing null to setMessage.
-   */
-  @Test
-  void failWhenDetailIsNullSetsErrorAndNullMessage() {
-    assertSame(actionResult, PrinterUtils.fail(actionResult, null),
-        "fail should return the same ActionResult instance");
-    verify(actionResult).setType(Result.Type.ERROR);
-    verify(actionResult).setMessage(null);
-    verifyNoMoreInteractions(actionResult);
-  }
-
-  /**
-   * Ensures warning sets the result type to WARNING, assigns the given detail as a message,
-   * and returns the same ActionResult instance.
-   */
-  @Test
-  void warningSetsWarningTypeAndMessageReturnsSameInstance() {
-    assertSame(actionResult, PrinterUtils.warning(actionResult, "Be careful"),
-        "warning should return the same ActionResult instance");
-    verify(actionResult).setType(Result.Type.WARNING);
-    verify(actionResult).setMessage("Be careful");
-    verifyNoMoreInteractions(actionResult);
-  }
-
-  /**
-   * Ensures warning accepts a null detail and still sets the WARNING type
-   * while passing null to setMessage.
-   */
-  @Test
-  void warningWhenDetailIsNullSetsWarningAndNullMessage() {
-    assertSame(actionResult, PrinterUtils.warning(actionResult, null),
-        "warning should return the same ActionResult instance");
-    verify(actionResult).setType(Result.Type.WARNING);
-    verify(actionResult).setMessage(null);
-    verifyNoMoreInteractions(actionResult);
-  }
 
   /**
    * Ensures resolveTemplateFile throws OBException when TemplateLine is null.
@@ -830,14 +453,13 @@ class PrinterUtilsTest {
    */
   @Test
   void loadOrCompileJasperReportWhenJasperLoadsReport() throws Exception {
-    String absPath = "/tmp/sample.jasper";
     File jrFile = File.createTempFile("tpl", JASPER_EXT);
     jrFile.deleteOnExit();
 
     try (MockedStatic<JRLoader> jrl = mockStatic(JRLoader.class)) {
       jrl.when(() -> JRLoader.loadObject(jrFile)).thenReturn(jasperReport);
 
-      JasperReport result = PrinterUtils.loadOrCompileJasperReport(absPath, jrFile);
+      JasperReport result = PrinterUtils.loadOrCompileJasperReport(SAMPLE_JASPER_PATH, jrFile);
       assertSame(jasperReport, result);
     }
   }
@@ -885,7 +507,6 @@ class PrinterUtilsTest {
    */
   @Test
   void loadOrCompileJasperReportWhenLoadFailsWrapsIntoPrintProviderException() throws Exception {
-    String absPath = "/tmp/sample.jasper";
     File jrFile = File.createTempFile("tpl", JASPER_EXT);
     jrFile.deleteOnExit();
 
@@ -895,9 +516,9 @@ class PrinterUtilsTest {
       jrl.when(() -> JRLoader.loadObject(jrFile)).thenThrow(new JRException("boom"));
 
       PrintProviderException ex = assertThrows(PrintProviderException.class,
-          () -> PrinterUtils.loadOrCompileJasperReport(absPath, jrFile));
+          () -> PrinterUtils.loadOrCompileJasperReport(SAMPLE_JASPER_PATH, jrFile));
 
-      assertTrue(ex.getMessage().contains(absPath));
+      assertTrue(ex.getMessage().contains(SAMPLE_JASPER_PATH));
     }
   }
 
@@ -943,34 +564,5 @@ class PrinterUtilsTest {
     when(providerParam.getParamContent()).thenReturn("some-value");
 
     assertDoesNotThrow(() -> PrinterUtils.providerParamContentCheck(providerParam, "ANY_KEY"));
-  }
-
-  /**
-   * Sets up minimal OBDal/criteria mocks used by {@code resolveTemplateLineFor(table)}.
-   *
-   * @param template
-   *     Template to return from Template criteria (or {@code null})
-   * @param lineToReturn
-   *     TemplateLine to return from TemplateLine criteria (or {@code null})
-   * @return active {@link MockedStatic} for {@link OBDal} that the caller must close
-   */
-  private MockedStatic<OBDal> mockResolveTemplateCriteria(Template template, TemplateLine lineToReturn) {
-    MockedStatic<OBDal> obDalStatic = mockStatic(OBDal.class);
-    obDalStatic.when(OBDal::getInstance).thenReturn(obDal);
-
-    @SuppressWarnings("unchecked") OBCriteria<Template> templateCrit = mock(OBCriteria.class);
-    when(obDal.createCriteria(Template.class)).thenReturn(templateCrit);
-    when(templateCrit.add(any(org.hibernate.criterion.Criterion.class))).thenReturn(templateCrit);
-    when(templateCrit.setMaxResults(anyInt())).thenReturn(templateCrit);
-    when(templateCrit.uniqueResult()).thenReturn(template);
-
-    @SuppressWarnings("unchecked") OBCriteria<TemplateLine> lineCrit = mock(OBCriteria.class);
-    when(obDal.createCriteria(TemplateLine.class)).thenReturn(lineCrit);
-    when(lineCrit.add(any(org.hibernate.criterion.Criterion.class))).thenReturn(lineCrit);
-    when(lineCrit.addOrder(any(org.hibernate.criterion.Order.class))).thenReturn(lineCrit);
-    when(lineCrit.setMaxResults(anyInt())).thenReturn(lineCrit);
-    when(lineCrit.uniqueResult()).thenReturn(lineToReturn);
-
-    return obDalStatic;
   }
 }

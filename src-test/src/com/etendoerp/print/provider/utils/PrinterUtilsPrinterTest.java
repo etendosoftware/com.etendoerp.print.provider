@@ -36,28 +36,22 @@ import org.openbravo.erpCommon.utility.OBMessageUtils;
 import com.etendoerp.print.provider.data.Printer;
 
 /**
- * Unit tests for the PrinterUtils class related to Printer entity operations.
+ * Unit tests for the {@link PrinterUtils#requirePrinter(String)} utility method.
  * <p>
- * This test class verifies the correct behavior of methods in PrinterUtils that interact with the Printer entity.
- * It uses Mockito for mocking dependencies and static methods, and JUnit 5 for test structure and assertions.
- * <p>
- * Key aspects tested:
+ * These tests verify the behavior of requirePrinter when searching for a printer by its ID:
  * <ul>
- *   <li>Correct retrieval of a Printer by its ID.</li>
- *   <li>Exception handling when a Printer is not found.</li>
- *   <li>Proper static mocking and resource management for OBMessageUtils and OBDal.</li>
+ *   <li>When a printer with the given ID exists, it is returned.</li>
+ *   <li>When no printer with the given ID exists, an {@link OBException} is thrown with a message containing the ID.</li>
  * </ul>
- * <p>
- * Each test ensures that static mocks are closed after execution to avoid conflicts between tests.
+ * The tests use Mockito to mock dependencies and static methods.
  */
 @ExtendWith(MockitoExtension.class)
 class PrinterUtilsPrinterTest {
-  private static final String PRINTER_NOT_FOUND = "Printer not found: %s";
+  private MockedStatic<OBMessageUtils> obMsgStatic;
   @Mock
   private Printer printer;
   @Mock
   private OBDal obDal;
-  private MockedStatic<OBMessageUtils> obMsgStatic = null;
 
   @BeforeEach
   void setUp() {
@@ -66,13 +60,11 @@ class PrinterUtilsPrinterTest {
 
   @AfterEach
   void tearDown() {
-    if (obMsgStatic != null) {
-      obMsgStatic.close();
-    }
+    if (obMsgStatic != null) obMsgStatic.close();
   }
 
   /**
-   * Ensures requirePrinter returns the Printer when it exists for the given id.
+   * Verifies that requirePrinter returns the Printer when it exists for the given ID.
    */
   @Test
   void requirePrinterWhenFoundReturnsPrinter() {
@@ -85,12 +77,14 @@ class PrinterUtilsPrinterTest {
   }
 
   /**
-   * Ensures requirePrinter throws OBException when no Printer exists for the given id.
+   * Verifies that requirePrinter throws OBException when no Printer exists for the given ID,
+   * and that the exception message contains the requested printer ID.
    */
   @Test
   void requirePrinterWhenNotFoundThrowsOBException() {
     String printerId = "MISSING-999";
-    obMsgStatic.when(() -> OBMessageUtils.getI18NMessage("ETPP_PrinterNotFoundById")).thenReturn(PRINTER_NOT_FOUND);
+    obMsgStatic.when(() -> OBMessageUtils.getI18NMessage("ETPP_PrinterNotFoundById")).thenReturn(
+        "Printer not found: %s");
     try (MockedStatic<OBDal> obDalStatic = mockStatic(OBDal.class)) {
       obDalStatic.when(OBDal::getInstance).thenReturn(obDal);
       when(obDal.get(Printer.class, printerId)).thenReturn(null);

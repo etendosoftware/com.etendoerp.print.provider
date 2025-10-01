@@ -204,14 +204,23 @@ public class UpdatePrinters extends Action {
    * Immutable container for upsert counts.
    */
   private static final class UpsertCounters {
-    // Number of printers created
+
+    /** Number of printers created. */
     public final int created;
-    // Number of printers updated
+
+    /** Number of printers updated. */
     public final int updated;
-    // Number of printers inactivated
+
+    /** Number of printers inactivated. */
     public final int inactivated;
 
-    // Constructor
+    /**
+     * Creates an immutable container for upsert results.
+     *
+     * @param created number of printers created
+     * @param updated number of printers updated
+     * @param inactivated number of printers inactivated
+     */
     UpsertCounters(int created, int updated, int inactivated) {
       this.created = created;
       this.updated = updated;

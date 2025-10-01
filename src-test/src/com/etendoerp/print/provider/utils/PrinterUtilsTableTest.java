@@ -16,6 +16,7 @@
  */
 package com.etendoerp.print.provider.utils;
 
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -37,29 +38,30 @@ import org.openbravo.dal.service.OBDal;
 import org.openbravo.erpCommon.utility.OBMessageUtils;
 import org.openbravo.model.ad.datamodel.Table;
 
+import com.etendoerp.print.provider.data.Template;
+import com.etendoerp.print.provider.data.TemplateLine;
+
 /**
- * Unit tests for the PrinterUtils class related to Table entity operations.
+ * Unit tests for table and template resolution utilities in {@link PrinterUtils}.
  * <p>
- * This test class verifies the correct behavior of methods in PrinterUtils that interact with the Table entity.
- * It uses Mockito for mocking dependencies and static methods, and JUnit 5 for test structure and assertions.
- * <p>
- * Key aspects tested:
+ * These tests cover:
  * <ul>
- *   <li>Correct retrieval of a Table by its name.</li>
- *   <li>Exception handling when a Table is not found.</li>
- *   <li>Proper static mocking and resource management for OBMessageUtils and OBDal.</li>
+ *   <li>{@code requireTableByName}: Ensures correct retrieval or exception when searching for a table by name.</li>
+ *   <li>{@code resolveTemplateLineFor}: Ensures correct retrieval of a template line for a table, or proper exception/null when not found.</li>
  * </ul>
- * <p>
- * Each test ensures that static mocks are closed after execution to avoid conflicts between tests.
+ * The tests use Mockito to mock dependencies and static methods, and verify both positive and negative scenarios.
  */
 @ExtendWith(MockitoExtension.class)
 class PrinterUtilsTableTest {
-  private static final String TABLE_NOT_FOUND = "Table not found: %s";
+  private MockedStatic<OBMessageUtils> obMsgStatic;
   @Mock
   private Table table;
   @Mock
+  private Template template;
+  @Mock
+  private TemplateLine templateLine;
+  @Mock
   private OBDal obDal;
-  private MockedStatic<OBMessageUtils> obMsgStatic = null;
 
   @BeforeEach
   void setUp() {
@@ -68,13 +70,11 @@ class PrinterUtilsTableTest {
 
   @AfterEach
   void tearDown() {
-    if (obMsgStatic != null) {
-      obMsgStatic.close();
-    }
+    if (obMsgStatic != null) obMsgStatic.close();
   }
 
   /**
-   * Ensures requireTableByName returns the Table when it exists for the given name.
+   * Verifies that requireTableByName returns the Table when it exists for the given entity name.
    */
   @Test
   void requireTableByNameWhenFoundReturnsTable() {
@@ -90,12 +90,13 @@ class PrinterUtilsTableTest {
   }
 
   /**
-   * Ensures requireTableByName throws OBException when no Table is found for the given name.
+   * Verifies that requireTableByName throws OBException when no Table is found for the given name,
+   * and that the exception message contains the entity name.
    */
   @Test
   void requireTableByNameWhenNotFoundThrowsOBException() {
     String entityName = "NonExistingTable";
-    obMsgStatic.when(() -> OBMessageUtils.getI18NMessage("ETPP_TableNotFound")).thenReturn(TABLE_NOT_FOUND);
+    obMsgStatic.when(() -> OBMessageUtils.getI18NMessage("ETPP_TableNotFound")).thenReturn("Table not found: %s");
     try (MockedStatic<OBDal> obDalStatic = mockStatic(OBDal.class)) {
       obDalStatic.when(OBDal::getInstance).thenReturn(obDal);
       @SuppressWarnings("unchecked") OBCriteria<Table> criteria = mock(OBCriteria.class);
@@ -105,5 +106,71 @@ class PrinterUtilsTableTest {
       OBException ex = assertThrows(OBException.class, () -> PrinterUtils.requireTableByName(entityName));
       assertTrue(ex.getMessage().contains(entityName));
     }
+  }
+
+  /**
+   * Verifies that resolveTemplateLineFor throws OBException when no Template exists for the given table,
+   * and that the exception message contains the table name.
+   */
+  @Test
+  void resolveTemplateLineForWhenTemplateNotFoundThrowsOBException() {
+    obMsgStatic.when(() -> OBMessageUtils.getI18NMessage("ETPP_PrintLocationNotFound")).thenReturn(
+        "Print location not found for table: %s");
+    when(table.getName()).thenReturn("Order");
+    try (MockedStatic<OBDal> obDalStatic = mockStatic(OBDal.class)) {
+      obDalStatic.when(OBDal::getInstance).thenReturn(obDal);
+      @SuppressWarnings("unchecked") OBCriteria<Template> templateCrit = mock(OBCriteria.class);
+      when(obDal.createCriteria(Template.class)).thenReturn(templateCrit);
+      when(templateCrit.add(any(org.hibernate.criterion.Criterion.class))).thenReturn(templateCrit);
+      when(templateCrit.uniqueResult()).thenReturn(null);
+      OBException ex = assertThrows(OBException.class, () -> PrinterUtils.resolveTemplateLineFor(table));
+      assertTrue(ex.getMessage().contains("Order"));
+    }
+  }
+
+  /**
+   * Verifies that resolveTemplateLineFor returns the TemplateLine when found for the table.
+   */
+  @Test
+  void resolveTemplateLineForWhenFoundReturnsBestTemplateLine() {
+    try (MockedStatic<OBDal> obDalStatic = mockResolveTemplateCriteria(template, templateLine)) {
+      assertSame(templateLine, PrinterUtils.resolveTemplateLineFor(table));
+    }
+  }
+
+  /**
+   * Verifies that resolveTemplateLineFor returns null when a Template exists but no TemplateLine is found.
+   */
+  @Test
+  void resolveTemplateLineForWhenNoTemplateLineReturnsNull() {
+    try (MockedStatic<OBDal> obDalStatic = mockResolveTemplateCriteria(template, null)) {
+      assertNull(PrinterUtils.resolveTemplateLineFor(table));
+    }
+  }
+
+  /**
+   * Utility to mock OBDal/criteria for template and template line resolution.
+   *
+   * @param template
+   *     Template to return from Template criteria (or null)
+   * @param lineToReturn
+   *     TemplateLine to return from TemplateLine criteria (or null)
+   * @return active MockedStatic for OBDal that the caller must close
+   */
+  private MockedStatic<OBDal> mockResolveTemplateCriteria(Template template, TemplateLine lineToReturn) {
+    MockedStatic<OBDal> obDalStatic = mockStatic(OBDal.class);
+    obDalStatic.when(OBDal::getInstance).thenReturn(obDal);
+    @SuppressWarnings("unchecked") OBCriteria<Template> templateCrit = mock(OBCriteria.class);
+    when(obDal.createCriteria(Template.class)).thenReturn(templateCrit);
+    when(templateCrit.add(any(org.hibernate.criterion.Criterion.class))).thenReturn(templateCrit);
+    when(templateCrit.setMaxResults(org.mockito.ArgumentMatchers.anyInt())).thenReturn(templateCrit);
+    when(templateCrit.uniqueResult()).thenReturn(template);
+    @SuppressWarnings("unchecked") OBCriteria<TemplateLine> lineCrit = mock(OBCriteria.class);
+    when(obDal.createCriteria(TemplateLine.class)).thenReturn(lineCrit);
+    when(lineCrit.add(any(org.hibernate.criterion.Criterion.class))).thenReturn(lineCrit);
+    when(lineCrit.addOrder(any(org.hibernate.criterion.Order.class))).thenReturn(lineCrit);
+    when(lineCrit.setMaxResults(org.mockito.ArgumentMatchers.anyInt())).thenReturn(lineCrit);
+    when(lineCrit.uniqueResult()).thenReturn(lineToReturn);
+    return obDalStatic;
   }
 }
