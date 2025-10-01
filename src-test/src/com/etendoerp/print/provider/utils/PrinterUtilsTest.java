@@ -82,6 +82,7 @@ class PrinterUtilsTest {
   private static final String JASPER_EXT = ".jasper";
   private static final String SAMPLE_JRXML_PATH = "/tmp/sample.jrxml";
   private static final String SAMPLE_JASPER_PATH = "/tmp/sample.jasper";
+  private static final String SAMPLE_TXT_PATH = "/tmp/sample.txt";
 
   private MockedStatic<OBMessageUtils> obMsgStatic;
 
@@ -469,14 +470,13 @@ class PrinterUtilsTest {
    */
   @Test
   void loadOrCompileJasperReportWhenUnsupportedExtThrowsPrintProviderException() {
-    String absPath = "/tmp/sample.txt";
-    File jrFile = new File(absPath);
+    File jrFile = new File(SAMPLE_TXT_PATH);
 
     obMsgStatic.when(() -> OBMessageUtils.getI18NMessage("ETPP_UnsupportedTemplateExtension")).thenReturn(
         "Unsupported: %s");
 
     PrintProviderException ex = assertThrows(PrintProviderException.class,
-        () -> PrinterUtils.loadOrCompileJasperReport(absPath, jrFile));
+        () -> PrinterUtils.loadOrCompileJasperReport(SAMPLE_TXT_PATH, jrFile));
 
     assertTrue(ex.getMessage().contains("sample.txt"));
   }
