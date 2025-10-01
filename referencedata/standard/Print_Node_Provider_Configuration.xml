@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?><ob:Openbravo xmlns:ob="http://www.openbravo.com" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" defaultValues="true">
+  <ETPP_Provider_Param id="40A18090D7764B068AC134348A34836A" identifier="printjoburl - https://api.printnode.com/printjobs">
+    <id>40A18090D7764B068AC134348A34836A</id>
+    <active>true</active>
+    <provider id="1D7F6096B4A14F17AAE2ABA4D3647D42" entity-name="ETPP_Provider" identifier="Print Node - PN"/>
+    <searchKey>printjoburl</searchKey>
+    <paramContent>https://api.printnode.com/printjobs</paramContent>
+    <description>URL for submitting print jobs using the Print Node provider.</description>
+  </ETPP_Provider_Param>
+  <ETPP_Provider_Param id="5AB92C90AEAD4A33AF46D9A57627AEA5" identifier="printersurl - https://api.printnode.com/printers">
+    <id>5AB92C90AEAD4A33AF46D9A57627AEA5</id>
+    <active>true</active>
+    <provider id="1D7F6096B4A14F17AAE2ABA4D3647D42" entity-name="ETPP_Provider" identifier="Print Node - PN"/>
+    <searchKey>printersurl</searchKey>
+    <paramContent>https://api.printnode.com/printers</paramContent>
+    <description>URL for obtaining printers through the Print Node provider.</description>
+  </ETPP_Provider_Param>
+  <ETPP_Provider_Param id="F1BE3D1A05BB4BF28510C6DE20ABF00B" identifier="apikey - ">
+    <id>F1BE3D1A05BB4BF28510C6DE20ABF00B</id>
+    <active>true</active>
+    <provider id="1D7F6096B4A14F17AAE2ABA4D3647D42" entity-name="ETPP_Provider" identifier="Print Node - PN"/>
+    <searchKey>apikey</searchKey>
+    <paramContent xsi:nil="true"/>
+    <description>Apikey generated in PrintNode to be able to authenticate Etendo with the PrintNode client.</description>
+  </ETPP_Provider_Param>
+  <ETPP_Provider id="1D7F6096B4A14F17AAE2ABA4D3647D42" identifier="Print Node - PN">
+    <id>1D7F6096B4A14F17AAE2ABA4D3647D42</id>
+    <active>true</active>
+    <name>Print Node</name>
+    <searchKey>PN</searchKey>
+    <providerImplementation id="76ABBE68620E4B3995DB3B81B26DA996" entity-name="ETPP_Providers_Impl" identifier="Print Node Integration"/>
+  </ETPP_Provider>
+</ob:Openbravo>
