@@ -27,7 +27,6 @@ import javax.servlet.ServletContext;
 import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONObject;
 import org.hibernate.criterion.Criterion;
-import org.hibernate.criterion.Order;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -75,6 +74,7 @@ class PrinterUtilsTest {
   private static final String ITEMS = "items";
   private static final String COPIES = "copies";
   private static final String JASPER_EXT = ".jasper";
+  private static final String SAMPLE_JRXML_PATH = "/tmp/sample.jrxml";
   private MockedStatic<OBMessageUtils> obMsgStatic;
 
   @Mock
@@ -799,13 +799,12 @@ class PrinterUtilsTest {
    */
   @Test
   void loadOrCompileJasperReportWhenJrxmlCompilesReport() {
-    String absPath = "/tmp/sample.jrxml";
-    File jrFile = new File(absPath);
+    File jrFile = new File(SAMPLE_JRXML_PATH);
 
     try (MockedStatic<JasperCompileManager> jcm = mockStatic(JasperCompileManager.class)) {
-      jcm.when(() -> JasperCompileManager.compileReport(absPath)).thenReturn(jasperReport);
+      jcm.when(() -> JasperCompileManager.compileReport(SAMPLE_JRXML_PATH)).thenReturn(jasperReport);
 
-      JasperReport result = PrinterUtils.loadOrCompileJasperReport(absPath, jrFile);
+      JasperReport result = PrinterUtils.loadOrCompileJasperReport(SAMPLE_JRXML_PATH, jrFile);
       assertSame(jasperReport, result);
     }
   }
@@ -850,18 +849,17 @@ class PrinterUtilsTest {
    */
   @Test
   void loadOrCompileJasperReportWhenCompilationFailsWrapsIntoPrintProviderException() {
-    String absPath = "/tmp/sample.jrxml";
-    File jrFile = new File(absPath);
+    File jrFile = new File(SAMPLE_JRXML_PATH);
 
     obMsgStatic.when(() -> OBMessageUtils.getI18NMessage("ETPP_ErrorLoadingOrCompilingJasper")).thenReturn("Error: %s");
 
     try (MockedStatic<JasperCompileManager> jcm = mockStatic(JasperCompileManager.class)) {
-      jcm.when(() -> JasperCompileManager.compileReport(absPath)).thenThrow(new JRException("boom"));
+      jcm.when(() -> JasperCompileManager.compileReport(SAMPLE_JRXML_PATH)).thenThrow(new JRException("boom"));
 
       PrintProviderException ex = assertThrows(PrintProviderException.class,
-          () -> PrinterUtils.loadOrCompileJasperReport(absPath, jrFile));
+          () -> PrinterUtils.loadOrCompileJasperReport(SAMPLE_JRXML_PATH, jrFile));
 
-      assertTrue(ex.getMessage().contains(absPath));
+      assertTrue(ex.getMessage().contains(SAMPLE_JRXML_PATH));
     }
   }
 

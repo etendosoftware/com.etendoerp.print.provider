@@ -92,7 +92,7 @@ class PrintNodeProviderTest {
   private HttpRequest httpRequest;
 
   @Mock
-  private HttpResponse httpResponse;
+  private HttpResponse<String> httpResponse;
 
   @Mock
   private Table table;

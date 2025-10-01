@@ -11,14 +11,22 @@ import org.openbravo.base.exception.OBException;
 public class PrintProviderException extends OBException {
 
   /**
-   * Plain message (already composed).
+   * Constructs a new PrintProviderException with the specified detail message.
+   *
+   * @param message
+   *     the detail message to be shown to the user or logged
    */
   public PrintProviderException(String message) {
     super(message);
   }
 
   /**
-   * Plain message with cause.
+   * Constructs a new PrintProviderException with the specified detail message and cause.
+   *
+   * @param message
+   *     the detail message to be shown to the user or logged
+   * @param cause
+   *     the cause of the exception (can be retrieved later by the {@link Throwable#getCause()} method)
    */
   public PrintProviderException(String message, Throwable cause) {
     super(message, cause);

@@ -72,6 +72,7 @@ import com.etendoerp.print.provider.data.TemplateLine;
  * @see com.etendoerp.print.provider.data.Printer
  * @see com.etendoerp.print.provider.data.TemplateLine
  */
+@SuppressWarnings("java:S1610")
 public abstract class PrintProviderStrategy {
 
   /**
