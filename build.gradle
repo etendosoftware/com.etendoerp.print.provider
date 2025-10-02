@@ -1,0 +1,79 @@
+/**
+*   This file was generated automatically by the 'createModuleBuild' task.
+*   Created at: 2025-09-30T18:01:14.916176Z.
+*
+*   WARNING: Do not put your credentials directly in this file.
+*
+*/
+
+group          = "com.etendoerp"
+version        = "1.0.0"
+description    = "Framework to register print providers, manage printers and templates, and route label jobs to provider-specific implementations for external middleware."
+ext.artifact   = "print.provider"
+ext.repository = "https://maven.pkg.github.com/etendosoftware/com.etendoerp.platform.extensions"
+
+configurations {
+    moduleDependencyContainer
+}
+
+sourceSets {
+    main {
+        resources {
+            srcDirs("etendo-resources")
+        }
+    }
+}
+
+publishing {
+    publications {
+        "com.etendoerp.print.provider"(MavenPublication) {
+            from components.java
+            groupId    = group
+            artifactId = artifact
+            version    = version
+        }
+    }
+    repositories {
+        maven {
+            url = "https://maven.pkg.github.com/etendosoftware/com.etendoerp.platform.extensions"
+        }
+    }
+}
+
+repositories {
+    mavenCentral()
+    maven {
+        url = "https://maven.pkg.github.com/etendosoftware/com.etendoerp.platform.extensions"
+    }
+    maven {
+        url = "https://repo.futit.cloud/repository/maven-releases"
+    }
+}
+
+/**
+* Declare Java dependencies using 'implementation'
+* Ex: implementation "com.sun.mail:javax.mail:1.6.2"
+*/
+dependencies {
+    implementation('net.sourceforge.barbecue:barbecue:1.5-beta1') { transitive = false }
+    implementation('net.sf.barcode4j:barcode4j:2.1') { transitive = false }
+    implementation('xml-apis:xml-apis-ext:1.3.04') { transitive = false }
+    implementation('org.apache.xmlgraphics:xmlgraphics-commons:2.6') { transitive = false }
+    implementation('org.apache.xmlgraphics:batik-anim:1.14') { transitive = false }
+    implementation('org.apache.xmlgraphics:batik-awt-util:1.14') { transitive = false }
+    implementation('org.apache.xmlgraphics:batik-bridge:1.14') { transitive = false }
+    implementation('org.apache.xmlgraphics:batik-constants:1.14') { transitive = false }
+    implementation('org.apache.xmlgraphics:batik-css:1.14') { transitive = false }
+    implementation('org.apache.xmlgraphics:batik-dom:1.14') { transitive = false }
+    implementation('org.apache.xmlgraphics:batik-ext:1.14') { transitive = false }
+    implementation('org.apache.xmlgraphics:batik-gvt:1.14') { transitive = false }
+    implementation('org.apache.xmlgraphics:batik-i18n:1.14') { transitive = false }
+    implementation('org.apache.xmlgraphics:batik-parser:1.14') { transitive = false }
+    implementation('org.apache.xmlgraphics:batik-script:1.14') { transitive = false }
+    implementation('org.apache.xmlgraphics:batik-svg-dom:1.14') { transitive = false }
+    implementation('org.apache.xmlgraphics:batik-svggen:1.14') { transitive = false }
+    implementation('org.apache.xmlgraphics:batik-transcoder:1.14') { transitive = false }
+    implementation('org.apache.xmlgraphics:batik-util:1.14') { transitive = false }
+    implementation('org.apache.xmlgraphics:batik-xml:1.14') { transitive = false }
+    implementation('com.etendoerp.platform:etendo-core:[22.1.0, 25.3.0)')
+}
