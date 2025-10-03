@@ -6,7 +6,7 @@
 <!--24A53DC5EB4C4F29A5412229D1F1671C-->  <AD_ORG_ID><![CDATA[0]]></AD_ORG_ID>
 <!--24A53DC5EB4C4F29A5412229D1F1671C-->  <ISACTIVE><![CDATA[Y]]></ISACTIVE>
 <!--24A53DC5EB4C4F29A5412229D1F1671C-->  <NAME><![CDATA[Etendo Print Provider]]></NAME>
-<!--24A53DC5EB4C4F29A5412229D1F1671C-->  <VERSION><![CDATA[1.0.0]]></VERSION>
+<!--24A53DC5EB4C4F29A5412229D1F1671C-->  <VERSION><![CDATA[1.1.0]]></VERSION>
 <!--24A53DC5EB4C4F29A5412229D1F1671C-->  <DESCRIPTION><![CDATA[Framework to register print providers, manage printers and templates, and route label jobs to provider-specific implementations for external middleware.]]></DESCRIPTION>
 <!--24A53DC5EB4C4F29A5412229D1F1671C-->  <HELP><![CDATA[The Print Provider Framework lets administrators add any third-party printing middleware in the Print Providers window, storing URL endpoints and credentials per organisation.
 A second window, Provider Implementations (System Admin only), links each provider to the Java class that performs the integration—responsible for fetching printers, generating label files (PDF, ZPL) and sending them to the middleware’s print endpoint.
