@@ -7,7 +7,7 @@
 */
 
 group          = "com.etendoerp"
-version        = "1.1.0"
+version        = "1.1.1"
 description    = "Framework to register print providers, manage printers and templates, and route label jobs to provider-specific implementations for external middleware."
 ext.artifact   = "print.provider"
 ext.repository = "https://maven.pkg.github.com/etendosoftware/com.etendoerp.platform.extensions"
