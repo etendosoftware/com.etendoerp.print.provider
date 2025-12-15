@@ -33,6 +33,7 @@ import javax.enterprise.inject.Instance;
 import org.codehaus.jettison.json.JSONObject;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.openbravo.base.exception.OBException;
 import org.openbravo.model.ad.datamodel.Table;
 
 import com.etendoerp.print.provider.api.GenerateLabelHook;
@@ -51,13 +52,12 @@ class GenerateLabelHookManagerTest {
   private static final String TABLE_ID_PRODUCT = "product-table-id";
   private static final String TABLE_DB_NAME = "C_Order";
   private static final String RECORD_ID = "test-record-456";
+  private static final String EXECUTION_ORDER = "executionOrder";
+  private static final String EXECUTION_COUNTER = "executionCounter";
 
   private GenerateLabelHookManager manager;
   private Instance<GenerateLabelHook> mockHooksInstance;
-  private Provider mockProvider;
   private Table mockTable;
-  private TemplateLine mockTemplateLine;
-  private JSONObject jsonParameters;
   private Map<String, Object> jrParams;
   private GenerateLabelContext context;
 
@@ -66,10 +66,10 @@ class GenerateLabelHookManagerTest {
    */
   @BeforeEach
   void setUp() {
-    mockProvider = mock(Provider.class);
+    Provider mockProvider = mock(Provider.class);
     mockTable = mock(Table.class);
-    mockTemplateLine = mock(TemplateLine.class);
-    jsonParameters = new JSONObject();
+    TemplateLine mockTemplateLine = mock(TemplateLine.class);
+    JSONObject jsonParameters = new JSONObject();
     jrParams = new HashMap<>();
 
     when(mockTable.getId()).thenReturn(TABLE_ID_ORDER);
@@ -127,7 +127,7 @@ class GenerateLabelHookManagerTest {
     manager.executeHooks(context);
 
     assertThat("Hook should have added parameter",
-        jrParams.get("executionOrder"), is(equalTo(100)));
+        jrParams.get(EXECUTION_ORDER), is(equalTo(100)));
   }
 
   /**
@@ -155,10 +155,10 @@ class GenerateLabelHookManagerTest {
 
     // Verify execution order by checking the final value (last hook wins)
     assertThat("Last hook should have priority 150",
-        jrParams.get("executionOrder"), is(equalTo(150)));
+        jrParams.get(EXECUTION_ORDER), is(equalTo(150)));
 
     // Verify all hooks were executed
-    assertThat("Counter should be 3", jrParams.get("executionCounter"), is(equalTo(3)));
+    assertThat("Counter should be 3", jrParams.get(EXECUTION_COUNTER), is(equalTo(3)));
   }
 
   /**
@@ -181,7 +181,7 @@ class GenerateLabelHookManagerTest {
 
     // Only 2 hooks should have executed
     assertThat("Counter should be 2 (only applicable hooks)",
-        jrParams.get("executionCounter"), is(equalTo(2)));
+        jrParams.get(EXECUTION_COUNTER), is(equalTo(2)));
   }
 
   /**
@@ -249,7 +249,7 @@ class GenerateLabelHookManagerTest {
 
     // Only first hook should have executed
     assertThat("Counter should be 1 (execution stopped after exception)",
-        jrParams.get("executionCounter"), is(equalTo(1)));
+        jrParams.get(EXECUTION_COUNTER), is(equalTo(1)));
   }
 
   /**
@@ -302,7 +302,7 @@ class GenerateLabelHookManagerTest {
   @Test
   void testGetApplicableHooksHandlesExceptionInApplicabilityCheck() {
     final List<GenerateLabelHook> hooks = new ArrayList<>();
-    hooks.add(new TestHookWithApplicabilityException());
+    hooks.add(new TestHookWithApplicabilityExc());
     hooks.add(new TestHook(TABLE_ID_ORDER, 100));
 
     mockHooksInstance = createMockInstance(hooks);
@@ -342,8 +342,7 @@ class GenerateLabelHookManagerTest {
    *
    * @param hooks
    *     the list of hooks to be returned by the mock instance.
-   * @return
-   *     a mock CDI Instance with the given hooks.
+   * @return a mock CDI Instance with the given hooks.
    */
   @SuppressWarnings("unchecked")
   private Instance<GenerateLabelHook> createMockInstance(List<GenerateLabelHook> hooks) {
@@ -380,16 +379,15 @@ class GenerateLabelHookManagerTest {
      */
     @Override
     public void execute(GenerateLabelContext context) {
-      context.addParameter("executionOrder", priority);
-      final Integer counter = (Integer) context.getParameter("executionCounter");
-      context.addParameter("executionCounter", counter == null ? 1 : counter + 1);
+      context.addParameter(EXECUTION_ORDER, priority);
+      final Integer counter = (Integer) context.getParameter(EXECUTION_COUNTER);
+      context.addParameter(EXECUTION_COUNTER, counter == null ? 1 : counter + 1);
     }
 
     /**
      * Returns the priority of the hook.
      *
-     * @return
-     *     the priority of the hook.
+     * @return the priority of the hook.
      */
     @Override
     public int getPriority() {
@@ -399,8 +397,7 @@ class GenerateLabelHookManagerTest {
     /**
      * Returns the list of tables to which the hook applies.
      *
-     * @return
-     *     the list of tables to which the hook applies.
+     * @return the list of tables to which the hook applies.
      */
     @Override
     public List<String> tablesToWhichItApplies() {
@@ -435,7 +432,6 @@ class GenerateLabelHookManagerTest {
      *
      * @param context
      *     the context in which the hook is executed.
-     *
      * @throws PrintProviderException
      *     if a PrintProviderException is thrown.
      */
@@ -444,15 +440,14 @@ class GenerateLabelHookManagerTest {
       if (throwPrintProviderException) {
         throw new PrintProviderException("Hook failed");
       } else {
-        throw new RuntimeException("Generic error");
+        throw new OBException("Generic error");
       }
     }
 
     /**
      * Returns the list of tables to which the hook applies.
      *
-     * @return
-     *     the list of tables to which the hook applies.
+     * @return the list of tables to which the hook applies.
      */
     @Override
     public List<String> tablesToWhichItApplies() {
@@ -465,7 +460,7 @@ class GenerateLabelHookManagerTest {
   /**
    * Test hook that throws exception during applicability check.
    */
-  private static class TestHookWithApplicabilityException implements GenerateLabelHook {
+  private static class TestHookWithApplicabilityExc implements GenerateLabelHook {
 
     /**
      * Executes the hook.
@@ -481,12 +476,11 @@ class GenerateLabelHookManagerTest {
     /**
      * Returns the list of tables to which the hook applies.
      *
-     * @return
-     *     the list of tables to which the hook applies.
+     * @return the list of tables to which the hook applies.
      */
     @Override
     public List<String> tablesToWhichItApplies() {
-      throw new RuntimeException("Error checking applicability");
+      throw new OBException("Error checking applicability");
     }
   }
 
@@ -508,8 +502,7 @@ class GenerateLabelHookManagerTest {
     /**
      * Returns the list of tables to which the hook applies.
      *
-     * @return
-     *     the list of tables to which the hook applies.
+     * @return the list of tables to which the hook applies.
      */
     @Override
     public List<String> tablesToWhichItApplies() {

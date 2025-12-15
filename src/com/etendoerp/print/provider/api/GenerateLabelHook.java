@@ -86,6 +86,11 @@ public interface GenerateLabelHook {
 
     /**
      * Adds or updates a parameter in the JasperReports parameters map.
+     *
+     * @param key
+     *     the parameter key
+     * @param value
+     *     the parameter value
      */
     public void addParameter(String key, Object value) {
       jrParams.put(key, value);
@@ -94,6 +99,8 @@ public interface GenerateLabelHook {
     /**
      * Gets the current value of a parameter.
      *
+     * @param key
+     *     the parameter key
      * @return the parameter value, or {@code null} if not present
      */
     public Object getParameter(String key) {
