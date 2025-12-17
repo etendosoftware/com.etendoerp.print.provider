@@ -92,6 +92,10 @@ public class GenerateLabelHookManager {
    */
   public void executeHooks(GenerateLabelContext context) throws PrintProviderException {
     final Table table = context.getTable();
+    if (table == null) {
+      log.warn("The context does not contain a table, skipping hook execution.");
+      return;
+    }
     final List<GenerateLabelHook> applicableHooks = getApplicableHooks(table);
 
     if (applicableHooks.isEmpty()) {
