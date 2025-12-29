@@ -7,7 +7,7 @@
 */
 
 group          = "com.etendoerp"
-version        = "1.1.1"
+version        = "1.2.0"
 description    = "Framework to register print providers, manage printers and templates, and route label jobs to provider-specific implementations for external middleware."
 ext.artifact   = "print.provider"
 ext.repository = "https://maven.pkg.github.com/etendosoftware/com.etendoerp.platform.extensions"
@@ -75,5 +75,5 @@ dependencies {
     implementation('org.apache.xmlgraphics:batik-transcoder:1.14') { transitive = false }
     implementation('org.apache.xmlgraphics:batik-util:1.14') { transitive = false }
     implementation('org.apache.xmlgraphics:batik-xml:1.14') { transitive = false }
-    implementation('com.etendoerp.platform:etendo-core:[22.1.0,25.4.0)')
+    implementation('com.etendoerp.platform:etendo-core:[22.1.0,26.1.0)')
 }
