@@ -114,4 +114,18 @@ public class ProviderStrategyResolver {
     }
   }
 
+  /**
+   * Returns a default {@link PrintProviderStrategy} instance for
+   * <em>download-only</em> mode (no provider configured).
+   *
+   * <p>The base class provides a full JasperReports-based
+   * {@code generateLabel} implementation, which is sufficient when no
+   * provider-specific behaviour is required.</p>
+   *
+   * @return a new {@link PrintProviderStrategy} with default behaviour
+   */
+  public static PrintProviderStrategy resolveDefault() {
+    return new PrintProviderStrategy();
+  }
+
 }

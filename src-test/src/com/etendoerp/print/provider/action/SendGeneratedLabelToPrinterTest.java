@@ -9,7 +9,7 @@
  * "AS IS" basis, WITHOUT WARRANTY OF ANY KIND, either express or
  * implied. See the License for the specific language governing rights
  * and limitations under the License.
- * All portions are Copyright © 2021–2025 FUTIT SERVICES, S.L
+ * All portions are Copyright © 2021–2026 FUTIT SERVICES, S.L
  * All Rights Reserved.
  * Contributor(s): Futit Services S.L.
  *************************************************************************
@@ -89,6 +89,9 @@ class SendGeneratedLabelToPrinterTest {
   private static final String MSG_SOME_FAILED = "%s print jobs failed";
   private static final String MSG_PRINT_FAILED_DOWNLOAD = "Print failed but download ready";
   private static final String MSG_DOWNLOAD_FAILED = "Download failed";
+  private static final String MSG_DOWNLOAD_ONLY_SUCCESS = "Labels generated and ready for download";
+  private static final String MSG_ALL_GEN_FAILED = "All label generations failed";
+  private static final String MSG_SOME_GEN_FAILED = "%s label(s) failed to generate";
 
   // Temp directory for download-enabled tests
   @TempDir
@@ -178,6 +181,14 @@ class SendGeneratedLabelToPrinterTest {
         .thenReturn("Success");
     sMsgStatic.when(() -> OBMessageUtils.messageBD("Warning"))
         .thenReturn("Warning");
+
+    // Stubs for download-only mode messages
+    sMsgStatic.when(() -> OBMessageUtils.getI18NMessage("ETPP_DownloadOnlySuccess"))
+        .thenReturn(MSG_DOWNLOAD_ONLY_SUCCESS);
+    sMsgStatic.when(() -> OBMessageUtils.getI18NMessage("ETPP_AllGenerationsFailed"))
+        .thenReturn(MSG_ALL_GEN_FAILED);
+    sMsgStatic.when(() -> OBMessageUtils.getI18NMessage("ETPP_SomeGenerationsFailed"))
+        .thenReturn(MSG_SOME_GEN_FAILED);
   }
 
   /**
@@ -248,6 +259,7 @@ class SendGeneratedLabelToPrinterTest {
     // Mock provider strategy resolution
     strategy = Mockito.mock(PrintProviderStrategy.class);
     sResolver.when(() -> ProviderStrategyResolver.resolveForProvider(provider)).thenReturn(strategy);
+    sResolver.when(ProviderStrategyResolver::resolveDefault).thenReturn(strategy);
   }
 
   /**
@@ -283,19 +295,24 @@ class SendGeneratedLabelToPrinterTest {
   }
 
   /**
-   * Verifies that the action throws an error if the provider parameter is missing.
-   * Ensures proper error handling for missing required parameters.
+   * When the provider parameter is absent, the action operates in download-only
+   * mode: generates labels using the default strategy and offers them for download.
    */
   @Test
-  void actionErrorMissingProviderParam() throws Exception {
-    // Remove provider parameter to simulate missing input
+  void actionDownloadOnlyWhenProviderMissing() throws Exception {
     JSONObject params = baseParams();
     params.remove(PrinterUtils.PROVIDER);
 
-    // Execute action and verify error result
+    File labelFile = createTempLabel("dl-only-no-prov");
+    Mockito.when(strategy.generateLabel(
+            eq(null), eq(table), eq(REC_1), eq(tLine), any(JSONObject.class)))
+        .thenReturn(labelFile);
+
     ActionResult res = action.action(params, new MutableBoolean(false));
-    assertThat(res.getType(), is(Result.Type.ERROR));
-    assertThat(res.getMessage(), is("Missing parameter: Provider"));
+
+    assertThat(res.getType(), is(Result.Type.SUCCESS));
+    assertThat(res.getMessage(), is(MSG_DOWNLOAD_ONLY_SUCCESS));
+    assertThat(res.getResponseActionsBuilder(), is(notNullValue()));
   }
 
   /**
@@ -731,17 +748,24 @@ class SendGeneratedLabelToPrinterTest {
   }
 
   /**
-   * Missing printers parameter → ERROR.
+   * When provider is set but printers is absent, the action operates in
+   * download-only mode using the provider's strategy.
    */
   @Test
-  void actionErrorMissingPrintersParam() throws Exception {
+  void actionDownloadOnlyWhenPrinterMissing() throws Exception {
     JSONObject params = baseParams();
     params.remove(PrinterUtils.PRINTERS);
 
+    File labelFile = createTempLabel("dl-only-no-prn");
+    Mockito.when(strategy.generateLabel(
+            eq(provider), eq(table), eq(REC_1), eq(tLine), any(JSONObject.class)))
+        .thenReturn(labelFile);
+
     ActionResult res = action.action(params, new MutableBoolean(false));
 
-    assertThat(res.getType(), is(Result.Type.ERROR));
-    assertThat(res.getMessage(), containsString(PrinterUtils.PRINTERS));
+    assertThat(res.getType(), is(Result.Type.SUCCESS));
+    assertThat(res.getMessage(), is(MSG_DOWNLOAD_ONLY_SUCCESS));
+    assertThat(res.getResponseActionsBuilder(), is(notNullValue()));
   }
 
   /**
@@ -785,6 +809,51 @@ class SendGeneratedLabelToPrinterTest {
 
     assertThat(res.getType(), is(Result.Type.WARNING));
     assertThat(res.getMessage(), containsString(MSG_DOWNLOAD_FAILED));
+  }
+
+  // ─── Download-only mode tests ──────────────────────────────────────────
+
+  /**
+   * Download-only mode (no provider): all label generations fail → ERROR.
+   */
+  @Test
+  void actionDownloadOnlyAllGenerationsFailed() throws Exception {
+    JSONObject params = baseParams();
+    params.remove(PrinterUtils.PROVIDER);
+
+    Mockito.when(strategy.generateLabel(
+            eq(null), eq(table), eq(REC_1), eq(tLine), any(JSONObject.class)))
+        .thenThrow(new RuntimeException("gen fail"));
+
+    ActionResult res = action.action(params, new MutableBoolean(false));
+
+    assertThat(res.getType(), is(Result.Type.ERROR));
+    assertThat(res.getMessage(), is(MSG_ALL_GEN_FAILED));
+  }
+
+  /**
+   * Download-only mode (no provider): two records, second generation fails →
+   * WARNING with partial download.
+   */
+  @Test
+  void actionDownloadOnlySomeGenerationsFailed() throws Exception {
+    JSONObject params = baseParams();
+    params.remove(PrinterUtils.PROVIDER);
+    params.put(PrinterUtils.RECORDS, new JSONArray().put(REC_1).put(REC_2));
+
+    File label1 = createTempLabel("dl-partial-1");
+    Mockito.when(strategy.generateLabel(
+            eq(null), eq(table), eq(REC_1), eq(tLine), any(JSONObject.class)))
+        .thenReturn(label1);
+    Mockito.when(strategy.generateLabel(
+            eq(null), eq(table), eq(REC_2), eq(tLine), any(JSONObject.class)))
+        .thenThrow(new RuntimeException("gen fail for rec-2"));
+
+    ActionResult res = action.action(params, new MutableBoolean(false));
+
+    assertThat(res.getType(), is(Result.Type.WARNING));
+    assertThat(res.getMessage(), containsString("1 label(s) failed"));
+    assertThat(res.getResponseActionsBuilder(), is(notNullValue()));
   }
 
   // ─── mergeLabels direct test ──────────────────────────────────────────

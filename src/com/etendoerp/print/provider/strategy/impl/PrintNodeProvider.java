@@ -20,44 +20,25 @@ import java.io.File;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.sql.SQLException;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-
-import javax.inject.Inject;
 
 import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
 import org.openbravo.base.exception.OBException;
-import org.openbravo.base.weld.WeldUtils;
-import org.openbravo.dal.service.OBDal;
 import org.openbravo.erpCommon.utility.OBMessageUtils;
-import org.openbravo.model.ad.datamodel.Table;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.etendoerp.print.provider.api.GenerateLabelHook;
 import com.etendoerp.print.provider.api.PrintProviderException;
 import com.etendoerp.print.provider.api.PrinterDTO;
 import com.etendoerp.print.provider.data.Printer;
 import com.etendoerp.print.provider.data.Provider;
 import com.etendoerp.print.provider.data.ProviderParam;
-import com.etendoerp.print.provider.data.TemplateLine;
-import com.etendoerp.print.provider.manager.GenerateLabelHookManager;
 import com.etendoerp.print.provider.strategy.PrintProviderStrategy;
 import com.etendoerp.print.provider.utils.PrintProviderUtils;
 import com.etendoerp.print.provider.utils.PrinterUtils;
-
-import net.sf.jasperreports.engine.JRException;
-import net.sf.jasperreports.engine.JasperExportManager;
-import net.sf.jasperreports.engine.JasperFillManager;
-import net.sf.jasperreports.engine.JasperPrint;
-import net.sf.jasperreports.engine.JasperReport;
 
 
 /**
@@ -74,12 +55,7 @@ public class PrintNodeProvider extends PrintProviderStrategy {
   private static final int CONNECT_TIMEOUT_SECONDS = 10;
   private static final int REQUEST_TIMEOUT_SECONDS = 20;
 
-  private static final String FILE_PREFIX = "etendo-label-";
-  private static final String FILE_EXTENSION = ".pdf";
   private static final String ETENDO_ERP = "Etendo ERP";
-
-  @Inject
-  private GenerateLabelHookManager hookManager;
 
   /**
    * Fetches the list of available printers from the configured PrintNode provider.
@@ -128,173 +104,6 @@ public class PrintNodeProvider extends PrintProviderStrategy {
     } catch (Exception e) {
       throw new PrintProviderException(e.getMessage(), e);
     }
-  }
-
-  /**
-   * Generates a label for the given record based on the template location.
-   *
-   * <p>This method takes the {@code templateRef} as a parameter and resolves it
-   * to an absolute path. It then compiles it (if it's a .jrxml file) or loads it
-   * (if it's a .jasper file) and then fills it with the given {@code recordId}
-   * and {@code parameters}.</p>
-   *
-   * <p>The generated PDF is saved to a temporary file and that file is
-   * returned.</p>
-   *
-   * <p><strong>Hook Integration:</strong> This method executes all registered
-   * {@link GenerateLabelHook} implementations that are applicable for the given table.
-   * Hooks are executed in priority order and can add or modify JasperReports parameters
-   * before the report is generated.</p>
-   *
-   * @param provider
-   *     the provider configuration containing API endpoint and key.
-   * @param table
-   *     Target table
-   * @param recordId
-   *     Target record ID
-   * @param templateRef
-   *     TemplateLine instance
-   * @param parameters
-   *     Extra parameters for the report
-   * @return Generated PDF file
-   * @throws PrintProviderException
-   *     If there is an error generating the label
-   */
-  @Override
-  @SuppressWarnings("java:S5443")
-  public File generateLabel(final Provider provider,
-      final Table table,
-      final String recordId,
-      final TemplateLine templateRef,
-      final JSONObject parameters) throws PrintProviderException {
-    try {
-      final File jrFile = PrinterUtils.resolveTemplateFile(templateRef);
-      final String absPath = jrFile.getAbsolutePath();
-
-      final JasperReport jasperReport = PrinterUtils.loadOrCompileJasperReport(absPath, jrFile);
-
-      // Initialize standard parameters
-      final Map<String, Object> jrParams = new HashMap<>();
-      jrParams.put("DOCUMENT_ID", recordId);
-
-      final String subdir = jrFile.getParentFile() == null
-          ? ""
-          : jrFile.getParentFile().getAbsolutePath() + File.separator;
-      jrParams.put("SUBREPORT_DIR", subdir);
-
-      // Execute hooks to allow custom parameter injection
-      executeGenerateLabelHooks(provider, table, recordId, templateRef, parameters, jrParams);
-
-      // Generate the report with accumulated parameters
-      final Path tmp = Files.createTempFile(FILE_PREFIX, FILE_EXTENSION);
-
-      // Check if a custom data source was provided by hooks
-      final boolean hasCustomDataSource = jrParams.containsKey("REPORT_DATA_SOURCE");
-
-      final JasperPrint print;
-      if (hasCustomDataSource) {
-        // Use the custom data source without database connection
-        log.debug("Using custom REPORT_DATA_SOURCE provided by hooks");
-        try {
-          print = JasperFillManager.fillReport(jasperReport, jrParams);
-        } catch (JRException e) {
-          throw new PrintProviderException("Error filling report with custom data source: " + e.getMessage(), e);
-        }
-      } else {
-        // Use traditional database connection approach
-        log.debug("Using database connection for report generation");
-        print = OBDal.getReadOnlyInstance()
-            .getSession()
-            .doReturningWork(conn -> {
-              try {
-                return JasperFillManager.fillReport(jasperReport, jrParams, conn);
-              } catch (JRException e) {
-                throw new SQLException(e.getMessage(), e);
-              }
-            });
-      }
-
-      JasperExportManager.exportReportToPdfFile(print, tmp.toString());
-      return tmp.toFile();
-
-    } catch (PrintProviderException e) {
-      throw e;
-    } catch (Exception e) {
-      throw new PrintProviderException(e.getMessage(), e);
-    }
-  }
-
-  /**
-   * Executes all applicable hooks for label generation parameter customization.
-   * <p>
-   * This method creates a {@link GenerateLabelHook.GenerateLabelContext} and passes it to the
-   * {@link GenerateLabelHookManager}, which discovers and executes all applicable hooks in
-   * priority order. Hooks can add or modify parameters in the {@code jrParams} map.
-   * </p>
-   *
-   * <p>
-   * If no {@link GenerateLabelHookManager} is available (e.g., CDI is not properly configured),
-   * this method logs a warning and continues without executing hooks. This ensures backward
-   * compatibility and graceful degradation.
-   * </p>
-   *
-   * @param provider
-   *     the provider configuration
-   * @param table
-   *     the target table
-   * @param recordId
-   *     the target record ID
-   * @param templateRef
-   *     the template line reference
-   * @param parameters
-   *     additional JSON parameters
-   * @param jrParams
-   *     the JasperReports parameters map to be modified by hooks
-   * @throws PrintProviderException
-   *     if any hook fails during execution
-   */
-  protected void executeGenerateLabelHooks(final Provider provider,
-      final Table table,
-      final String recordId,
-      final TemplateLine templateRef,
-      final JSONObject parameters,
-      final Map<String, Object> jrParams) throws PrintProviderException {
-
-    // Obtain hook manager instance
-    GenerateLabelHookManager manager = getHookManager();
-    if (manager == null) {
-      log.warn("GenerateLabelHookManager not available. Hooks will not be executed.");
-      return;
-    }
-
-    // Create context and execute hooks
-    final GenerateLabelHook.GenerateLabelContext context =
-        new GenerateLabelHook.GenerateLabelContext(
-            provider, table, recordId, templateRef, parameters, jrParams);
-
-    manager.executeHooks(context);
-  }
-
-  /**
-   * Retrieves the hook manager instance, using CDI when available.
-   * <p>
-   * This method attempts to obtain the {@link GenerateLabelHookManager} via CDI injection
-   * if it hasn't been injected yet. This allows for both constructor injection (preferred)
-   * and lazy initialization (fallback).
-   * </p>
-   *
-   * @return the hook manager instance, or {@code null} if CDI is not available
-   */
-  protected GenerateLabelHookManager getHookManager() {
-    if (hookManager == null) {
-      try {
-        hookManager = WeldUtils.getInstanceFromStaticBeanManager(GenerateLabelHookManager.class);
-      } catch (Exception e) {
-        log.debug("Could not obtain GenerateLabelHookManager via CDI: {}", e.getMessage());
-        return null;
-      }
-    }
-    return hookManager;
   }
 
   /**

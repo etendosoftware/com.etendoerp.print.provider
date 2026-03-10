@@ -72,19 +72,96 @@ public class SendGeneratedLabelToPrinter extends Action {
   private static final String LABEL_PREFIX = "etendo-label-";
 
   /**
+   * Holds the resolved printing context for a single action invocation.
+   * Provider and printer are optional; when absent the action operates in
+   * download-only mode.
+   */
+  static class PrintJobContext {
+    final Provider provider;
+    final PrintProviderStrategy strategy;
+    final Printer targetPrinter;
+    final int numberOfCopies;
+    final boolean printingEnabled;
+    final boolean downloadEnabled;
+
+    PrintJobContext(Provider provider, PrintProviderStrategy strategy,
+        Printer targetPrinter, int numberOfCopies,
+        boolean printingEnabled, boolean downloadEnabled) {
+      this.provider = provider;
+      this.strategy = strategy;
+      this.targetPrinter = targetPrinter;
+      this.numberOfCopies = numberOfCopies;
+      this.printingEnabled = printingEnabled;
+      this.downloadEnabled = downloadEnabled;
+    }
+  }
+
+  /**
+   * Resolves the printing context from the given parameters.
+   *
+   * <p>Provider and Printer are optional. When the provider is absent, the
+   * default {@link PrintProviderStrategy} is used and printing is disabled
+   * (download-only mode). When the provider is present but no printer is
+   * selected, generation uses the provider's strategy but printing is also
+   * disabled.</p>
+   *
+   * @param parameters
+   *     the process parameters
+   * @return the resolved context
+   */
+  PrintJobContext resolvePrintJobContext(JSONObject parameters) {
+    final String providerId = normalizeOptionalId(
+        parameters.optString(PrinterUtils.PROVIDER, null));
+    final String printerId = normalizeOptionalId(
+        parameters.optString(PrinterUtils.PRINTERS, null));
+
+    final Provider provider;
+    final PrintProviderStrategy strategy;
+    if (providerId != null) {
+      provider = PrinterUtils.requireProvider(providerId);
+      strategy = ProviderStrategyResolver.resolveForProvider(provider);
+    } else {
+      provider = null;
+      strategy = ProviderStrategyResolver.resolveDefault();
+    }
+
+    final boolean printingEnabled = providerId != null && printerId != null;
+    final Printer targetPrinter;
+    final int numberOfCopies;
+    if (printingEnabled) {
+      targetPrinter = PrinterUtils.requirePrinter(printerId);
+      numberOfCopies = PrinterUtils.requirePositiveInt(parameters, PrinterUtils.NUMBER_OF_COPIES);
+    } else {
+      targetPrinter = null;
+      numberOfCopies = 1;
+    }
+
+    // Download: Y by default; forced to Y when not printing
+    final boolean downloadEnabled = !printingEnabled || !"N".equalsIgnoreCase(
+        parameters.optString(PrinterUtils.DOWNLOAD_LABEL, "Y"));
+
+    return new PrintJobContext(provider, strategy, targetPrinter, numberOfCopies,
+        printingEnabled, downloadEnabled);
+  }
+
+  /**
    * Processes the given {@code parameters} by generating labels for the given
-   * {@code entityName} records and sending them to the selected printer. The
+   * {@code entityName} records and optionally sending them to a printer. The
    * following parameters are expected:
    * <ul>
-   *   <li>{@code provider}: the ID of the provider to use (e.g. a PrintNode
-   *       provider)</li>
+   *   <li>{@code provider}: (optional) the ID of the provider to use. When
+   *       absent, the default strategy is used and the action operates in
+   *       download-only mode.</li>
    *   <li>{@code entityName}: the name of the table to generate labels for
-   *       (e.g. {@code C_Order}</li>
+   *       (e.g. {@code C_Order})</li>
    *   <li>{@code records}: a JSON array of record IDs to generate labels for</li>
-   *   <li>{@code printers}: the ID of the printer to send the labels to</li>
-   *   <li>{@code numberOfCopies}: the number of copies to print</li>
+   *   <li>{@code printers}: (optional) the ID of the printer to send the
+   *       labels to. Required when {@code provider} is set.</li>
+   *   <li>{@code numberOfCopies}: the number of copies to print. Required
+   *       when both {@code provider} and {@code printers} are set.</li>
    *   <li>{@code downloadlabel}: {@code "Y"} to download the generated PDF
-   *       (default), {@code "N"} to only print without downloading</li>
+   *       (default), {@code "N"} to only print without downloading.
+   *       Forced to {@code "Y"} in download-only mode.</li>
    * </ul>
    *
    * <p>This action will log errors if there are any issues generating or sending
@@ -102,82 +179,68 @@ public class SendGeneratedLabelToPrinter extends Action {
     try {
       OBContext.setAdminMode(true);
 
-      // --- Validate & read params (via PrinterUtils) ---
-      final String providerId = PrinterUtils.requireParam(parameters, PrinterUtils.PROVIDER);
+      // --- Validate & read required params ---
       final String entityName = PrinterUtils.requireParam(parameters, PrinterUtils.ENTITY_NAME);
       final JSONArray records = PrinterUtils.requireJSONArray(parameters, PrinterUtils.RECORDS);
-      final String printerId = PrinterUtils.requireParam(parameters, PrinterUtils.PRINTERS);
-      final int numberOfCopies = PrinterUtils.requirePositiveInt(parameters, PrinterUtils.NUMBER_OF_COPIES);
-
-      // Download parameter: Y by default
-      final boolean downloadEnabled = !"N".equalsIgnoreCase(
-          parameters.optString(PrinterUtils.DOWNLOAD_LABEL, "Y"));
-
-      // --- Resolve DAL entities / strategy ---
-      final Provider provider = PrinterUtils.requireProvider(providerId);
-      final PrintProviderStrategy strategy = ProviderStrategyResolver.resolveForProvider(provider);
-      final Printer targetPrinter = PrinterUtils.requirePrinter(printerId);
       final Table table = PrinterUtils.requireTableByName(entityName);
       final TemplateLine templateLine = PrinterUtils.resolveTemplateLineFor(table);
 
-      // --- Iterate over records: generate label + send to printer ---
+      // --- Resolve printing context (provider & printer are optional) ---
+      final PrintJobContext ctx = resolvePrintJobContext(parameters);
+
+      // --- Iterate over records: generate label + optionally send to printer ---
       final List<String> jobIds = new ArrayList<>(records.length());
-      int printFailureCount = 0;
+      int failureCount = 0;
 
       for (int i = 0; i < records.length(); i++) {
         final String recordId = records.getString(i);
         File label = null;
         boolean labelRetained = false;
         try {
-          label = strategy.generateLabel(provider, table, recordId, templateLine, parameters);
+          label = ctx.strategy.generateLabel(
+              ctx.provider, table, recordId, templateLine, parameters);
 
           // Retain the file for download BEFORE attempting to print,
           // so that a printer failure does not prevent the download.
-          if (downloadEnabled && label != null && label.exists()) {
+          if (ctx.downloadEnabled && label != null && label.exists()) {
             downloadableLabels.add(label);
             labelRetained = true;
           }
 
-          final String jobId = strategy.sendToPrinter(provider, targetPrinter, numberOfCopies, label);
-          jobIds.add(StringUtils.defaultIfBlank(jobId, "-"));
+          if (ctx.printingEnabled) {
+            final String jobId = ctx.strategy.sendToPrinter(
+                ctx.provider, ctx.targetPrinter, ctx.numberOfCopies, label);
+            jobIds.add(StringUtils.defaultIfBlank(jobId, "-"));
+          }
         } catch (Exception e) {
-          log.error("Error printing record {} on printer {}: {}", recordId, printerId, e.getMessage(), e);
-          printFailureCount++;
+          log.error("Error processing record {}: {}", recordId, e.getMessage(), e);
+          failureCount++;
         } finally {
-          // Only delete the file if it was NOT retained for download
           if (!labelRetained) {
             safeDelete(label, recordId);
           }
         }
       }
 
-      // --- Build result message & handle download ---
-      final boolean canDownload = downloadEnabled && !downloadableLabels.isEmpty();
+      // --- Build result ---
+      if (!ctx.printingEnabled) {
+        return buildDownloadOnlyResult(res, parameters, failureCount, downloadableLabels);
+      }
 
-      if (printFailureCount > 0) {
-        return handlePrintFailures(res, parameters, printFailureCount, records.length(),
+      final boolean canDownload = ctx.downloadEnabled && !downloadableLabels.isEmpty();
+
+      if (failureCount > 0) {
+        return handlePrintFailures(res, parameters, failureCount, records.length(),
             canDownload, downloadableLabels);
       }
 
-      // All print jobs succeeded
-      final StringJoiner sj = new StringJoiner(", ");
-      jobIds.forEach(sj::add);
-      final String resultMessage = String.format(
-          OBMessageUtils.getI18NMessage("ETPP_PrintJobSent"), sj.toString());
-
-      if (canDownload) {
-        return buildDownloadResponse(res, parameters, downloadableLabels, resultMessage,
-            ResponseActionsBuilder.MessageType.SUCCESS);
-      }
-
-      res.setMessage(resultMessage);
-      log.debug("SendGeneratedLabelToPrinter process finished: {}", res.getMessage());
-      return res;
+      return buildSuccessResult(res, parameters, jobIds, canDownload, downloadableLabels);
 
     } catch (PrintProviderException e) {
       log.error(e.getMessage(), e);
       OBDal.getInstance().rollbackAndClose();
-      return PrinterUtils.fail(res, String.format(OBMessageUtils.getI18NMessage("ETPP_ProviderError"), e.getMessage()));
+      return PrinterUtils.fail(res,
+          String.format(OBMessageUtils.getI18NMessage("ETPP_ProviderError"), e.getMessage()));
     } catch (Exception e) {
       log.error(e.getMessage(), e);
       OBDal.getInstance().rollbackAndClose();
@@ -294,6 +357,76 @@ public class SendGeneratedLabelToPrinter extends Action {
     final String msg = String.format(
         OBMessageUtils.getI18NMessage("ETPP_SomePrintJobsFailed"), printFailureCount);
     return PrinterUtils.warning(res, msg);
+  }
+
+  /**
+   * Builds the response for a fully successful print run, including an
+   * optional download when labels were retained.
+   */
+  private ActionResult buildSuccessResult(ActionResult res, JSONObject parameters,
+      List<String> jobIds, boolean canDownload, List<File> downloadableLabels) {
+    final StringJoiner sj = new StringJoiner(", ");
+    jobIds.forEach(sj::add);
+    final String resultMessage = String.format(
+        OBMessageUtils.getI18NMessage("ETPP_PrintJobSent"), sj.toString());
+
+    if (canDownload) {
+      return buildDownloadResponse(res, parameters, downloadableLabels, resultMessage,
+          ResponseActionsBuilder.MessageType.SUCCESS);
+    }
+
+    res.setMessage(resultMessage);
+    log.debug("SendGeneratedLabelToPrinter process finished: {}", res.getMessage());
+    return res;
+  }
+
+  /**
+   * Builds the result when operating in download-only mode
+   * (no provider or no printer configured).
+   *
+   * @return ERROR if all generations failed, WARNING if some failed,
+   *     SUCCESS with download otherwise
+   */
+  private ActionResult buildDownloadOnlyResult(ActionResult res, JSONObject parameters,
+      int failureCount, List<File> downloadableLabels) {
+    if (downloadableLabels.isEmpty()) {
+      return PrinterUtils.fail(res,
+          OBMessageUtils.getI18NMessage("ETPP_AllGenerationsFailed"));
+    }
+    if (failureCount > 0) {
+      final String msg = String.format(
+          OBMessageUtils.getI18NMessage("ETPP_SomeGenerationsFailed"), failureCount);
+      return buildDownloadResponse(res, parameters, downloadableLabels, msg,
+          ResponseActionsBuilder.MessageType.WARNING);
+    }
+    return buildDownloadResponse(res, parameters, downloadableLabels,
+        OBMessageUtils.getI18NMessage("ETPP_DownloadOnlySuccess"),
+        ResponseActionsBuilder.MessageType.SUCCESS);
+  }
+
+  /**
+   * Normalises an optional parameter value coming from the UI.
+   *
+   * <p>Openbravo/Etendo selectors may send the literal strings {@code "null"}
+   * or {@code "undefined"} instead of a real JSON null when no value is
+   * selected. This helper maps all those "empty-ish" representations to
+   * Java {@code null}.</p>
+   *
+   * @param value
+   *     the raw string obtained from {@code JSONObject.optString}
+   * @return the trimmed value, or {@code null} if the input is blank,
+   *     {@code "null"} or {@code "undefined"}
+   */
+  static String normalizeOptionalId(String value) {
+    if (value == null) {
+      return null;
+    }
+    final String trimmed = value.trim();
+    if (trimmed.isEmpty() || "null".equalsIgnoreCase(trimmed)
+        || "undefined".equalsIgnoreCase(trimmed)) {
+      return null;
+    }
+    return trimmed;
   }
 
   /**
