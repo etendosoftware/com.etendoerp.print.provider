@@ -136,9 +136,9 @@ public class SendGeneratedLabelToPrinter extends Action {
       numberOfCopies = 1;
     }
 
-    // Download: Y by default; forced to Y when not printing
-    final boolean downloadEnabled = !printingEnabled || !"N".equalsIgnoreCase(
-        parameters.optString(PrinterUtils.DOWNLOAD_LABEL, "Y"));
+    // Download: enabled by default (unless explicitly set to "false")
+    final boolean downloadEnabled = !"false".equalsIgnoreCase(
+        parameters.optString(PrinterUtils.DOWNLOAD_LABEL, "true"));
 
     return new PrintJobContext(provider, strategy, targetPrinter, numberOfCopies,
         printingEnabled, downloadEnabled);
@@ -159,9 +159,10 @@ public class SendGeneratedLabelToPrinter extends Action {
    *       labels to. Required when {@code provider} is set.</li>
    *   <li>{@code numberOfCopies}: the number of copies to print. Required
    *       when both {@code provider} and {@code printers} are set.</li>
-   *   <li>{@code downloadlabel}: {@code "Y"} to download the generated PDF
-   *       (default), {@code "N"} to only print without downloading.
-   *       Forced to {@code "Y"} in download-only mode.</li>
+   *   <li>{@code downloadlabel}: {@code "true"} to download the generated PDF
+   *       (default), {@code "false"} to only print without downloading.
+   *       When no provider is selected and download is disabled, a warning
+   *       is returned since there is nothing to do.</li>
    * </ul>
    *
    * <p>This action will log errors if there are any issues generating or sending
@@ -192,13 +193,21 @@ public class SendGeneratedLabelToPrinter extends Action {
       final List<String> jobIds = new ArrayList<>(records.length());
       int failureCount = 0;
 
+      if (ctx.provider == null && !ctx.downloadEnabled){
+        return PrinterUtils.warning(res,
+            OBMessageUtils.getI18NMessage("ETPP_NoJobsToDownloadOrSend"));
+      }
+
       for (int i = 0; i < records.length(); i++) {
         final String recordId = records.getString(i);
         File label = null;
         boolean labelRetained = false;
         try {
-          label = ctx.strategy.generateLabel(
-              ctx.provider, table, recordId, templateLine, parameters);
+
+          if (ctx.provider != null || ctx.downloadEnabled) {
+            label = ctx.strategy.generateLabel(
+                ctx.provider, table, recordId, templateLine, parameters);
+          }
 
           // Retain the file for download BEFORE attempting to print,
           // so that a printer failure does not prevent the download.
@@ -368,7 +377,7 @@ public class SendGeneratedLabelToPrinter extends Action {
     final StringJoiner sj = new StringJoiner(", ");
     jobIds.forEach(sj::add);
     final String resultMessage = String.format(
-        OBMessageUtils.getI18NMessage("ETPP_PrintJobSent"), sj.toString());
+        OBMessageUtils.getI18NMessage("ETPP_PrintJobSent"), sj);
 
     if (canDownload) {
       return buildDownloadResponse(res, parameters, downloadableLabels, resultMessage,

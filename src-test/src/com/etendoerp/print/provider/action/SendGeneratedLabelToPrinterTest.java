@@ -77,6 +77,7 @@ class SendGeneratedLabelToPrinterTest {
   private static final String ENTITY = "M_InOut";
   private static final String REC_1 = "rec-1";
   private static final String REC_2 = "rec-2";
+  private static final String TRUE = "true";
 
   // Message templates for assertions
   private static final String MSG_MISSING_PARAM = "Missing parameter: %s";
@@ -92,6 +93,7 @@ class SendGeneratedLabelToPrinterTest {
   private static final String MSG_DOWNLOAD_ONLY_SUCCESS = "Labels generated and ready for download";
   private static final String MSG_ALL_GEN_FAILED = "All label generations failed";
   private static final String MSG_SOME_GEN_FAILED = "%s label(s) failed to generate";
+  private static final String MSG_NO_JOBS = "There are no jobs to download or send to printers.";
 
   // Temp directory for download-enabled tests
   @TempDir
@@ -128,8 +130,8 @@ class SendGeneratedLabelToPrinterTest {
     json.put(PrinterUtils.PRINTERS, PRN_OK);
     json.put(PrinterUtils.NUMBER_OF_COPIES, 1);
     json.put(PrinterUtils.RECORDS, new JSONArray().put(REC_1));
-    // Disable download for unit tests to avoid mocking ReportingUtils / ResponseActionsBuilder
-    json.put(PrinterUtils.DOWNLOAD_LABEL, "N");
+    // Disable download by default; tests that need it override to "true"
+    json.put(PrinterUtils.DOWNLOAD_LABEL, "false");
     return json;
   }
 
@@ -189,6 +191,8 @@ class SendGeneratedLabelToPrinterTest {
         .thenReturn(MSG_ALL_GEN_FAILED);
     sMsgStatic.when(() -> OBMessageUtils.getI18NMessage("ETPP_SomeGenerationsFailed"))
         .thenReturn(MSG_SOME_GEN_FAILED);
+    sMsgStatic.when(() -> OBMessageUtils.getI18NMessage("ETPP_NoJobsToDownloadOrSend"))
+        .thenReturn(MSG_NO_JOBS);
   }
 
   /**
@@ -302,6 +306,7 @@ class SendGeneratedLabelToPrinterTest {
   void actionDownloadOnlyWhenProviderMissing() throws Exception {
     JSONObject params = baseParams();
     params.remove(PrinterUtils.PROVIDER);
+    params.put(PrinterUtils.DOWNLOAD_LABEL, TRUE);
 
     File labelFile = createTempLabel("dl-only-no-prov");
     Mockito.when(strategy.generateLabel(
@@ -313,6 +318,22 @@ class SendGeneratedLabelToPrinterTest {
     assertThat(res.getType(), is(Result.Type.SUCCESS));
     assertThat(res.getMessage(), is(MSG_DOWNLOAD_ONLY_SUCCESS));
     assertThat(res.getResponseActionsBuilder(), is(notNullValue()));
+  }
+
+  /**
+   * When neither provider nor download are enabled there is nothing to do,
+   * so the action returns WARNING with {@code ETPP_NoJobsToDownloadOrSend}.
+   */
+  @Test
+  void actionNoProviderNoDownloadReturnsWarning() throws Exception {
+    JSONObject params = baseParams();
+    params.remove(PrinterUtils.PROVIDER);
+    // download is already "false" from baseParams
+
+    ActionResult res = action.action(params, new MutableBoolean(false));
+
+    assertThat(res.getType(), is(Result.Type.WARNING));
+    assertThat(res.getMessage(), is(MSG_NO_JOBS));
   }
 
   /**
@@ -449,7 +470,7 @@ class SendGeneratedLabelToPrinterTest {
   @Test
   void actionSuccessfulPrintWithDownload() throws Exception {
     JSONObject params = baseParams();
-    params.put(PrinterUtils.DOWNLOAD_LABEL, "Y");
+    params.put(PrinterUtils.DOWNLOAD_LABEL, TRUE);
 
     File labelFile = createTempLabel("dl-1");
     Mockito.when(strategy.generateLabel(
@@ -514,7 +535,7 @@ class SendGeneratedLabelToPrinterTest {
   @Test
   void actionAllFailedDownloadEnabledWithLabelsReturnsWarningWithDownload() throws Exception {
     JSONObject params = baseParams();
-    params.put(PrinterUtils.DOWNLOAD_LABEL, "Y");
+    params.put(PrinterUtils.DOWNLOAD_LABEL, TRUE);
 
     File labelFile = createTempLabel("fail-dl-1");
     Mockito.when(strategy.generateLabel(
@@ -538,7 +559,7 @@ class SendGeneratedLabelToPrinterTest {
   @Test
   void actionAllFailedDownloadEnabledNoLabelsReturnsError() throws Exception {
     JSONObject params = baseParams();
-    params.put(PrinterUtils.DOWNLOAD_LABEL, "Y");
+    params.put(PrinterUtils.DOWNLOAD_LABEL, TRUE);
 
     Mockito.when(strategy.generateLabel(
             eq(provider), eq(table), eq(REC_1), eq(tLine), any(JSONObject.class)))
@@ -587,7 +608,7 @@ class SendGeneratedLabelToPrinterTest {
   @Test
   void actionSomeFailedWithDownloadReturnsWarningWithDownload() throws Exception {
     JSONObject params = baseParams();
-    params.put(PrinterUtils.DOWNLOAD_LABEL, "Y");
+    params.put(PrinterUtils.DOWNLOAD_LABEL, TRUE);
     params.put(PrinterUtils.RECORDS, new JSONArray().put(REC_1).put(REC_2));
 
     File label1 = createTempLabel("part-dl-1");
@@ -701,7 +722,7 @@ class SendGeneratedLabelToPrinterTest {
   @Test
   void actionLabelNullNotRetainedForDownload() throws Exception {
     JSONObject params = baseParams();
-    params.put(PrinterUtils.DOWNLOAD_LABEL, "Y");
+    params.put(PrinterUtils.DOWNLOAD_LABEL, TRUE);
 
     Mockito.when(strategy.generateLabel(
             eq(provider), eq(table), eq(REC_1), eq(tLine), any(JSONObject.class)))
@@ -755,6 +776,7 @@ class SendGeneratedLabelToPrinterTest {
   void actionDownloadOnlyWhenPrinterMissing() throws Exception {
     JSONObject params = baseParams();
     params.remove(PrinterUtils.PRINTERS);
+    params.put(PrinterUtils.DOWNLOAD_LABEL, TRUE);
 
     File labelFile = createTempLabel("dl-only-no-prn");
     Mockito.when(strategy.generateLabel(
@@ -791,7 +813,7 @@ class SendGeneratedLabelToPrinterTest {
   @Test
   void actionDownloadBuildFailureReturnsWarningWithDownloadFailed() throws Exception {
     JSONObject params = baseParams();
-    params.put(PrinterUtils.DOWNLOAD_LABEL, "Y");
+    params.put(PrinterUtils.DOWNLOAD_LABEL, TRUE);
 
     File labelFile = createTempLabel("build-fail");
     Mockito.when(strategy.generateLabel(
@@ -820,6 +842,7 @@ class SendGeneratedLabelToPrinterTest {
   void actionDownloadOnlyAllGenerationsFailed() throws Exception {
     JSONObject params = baseParams();
     params.remove(PrinterUtils.PROVIDER);
+    params.put(PrinterUtils.DOWNLOAD_LABEL, TRUE);
 
     Mockito.when(strategy.generateLabel(
             eq(null), eq(table), eq(REC_1), eq(tLine), any(JSONObject.class)))
@@ -839,6 +862,7 @@ class SendGeneratedLabelToPrinterTest {
   void actionDownloadOnlySomeGenerationsFailed() throws Exception {
     JSONObject params = baseParams();
     params.remove(PrinterUtils.PROVIDER);
+    params.put(PrinterUtils.DOWNLOAD_LABEL, TRUE);
     params.put(PrinterUtils.RECORDS, new JSONArray().put(REC_1).put(REC_2));
 
     File label1 = createTempLabel("dl-partial-1");
