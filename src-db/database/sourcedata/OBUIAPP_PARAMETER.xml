@@ -123,8 +123,8 @@ The chosen record determines:
 <!--D4E5F67A8B9C0D1E2F3A4B5C6D7E8F9A-->  <ISACTIVE><![CDATA[Y]]></ISACTIVE>
 <!--D4E5F67A8B9C0D1E2F3A4B5C6D7E8F9A-->  <AD_MODULE_ID><![CDATA[24A53DC5EB4C4F29A5412229D1F1671C]]></AD_MODULE_ID>
 <!--D4E5F67A8B9C0D1E2F3A4B5C6D7E8F9A-->  <NAME><![CDATA[Download]]></NAME>
-<!--D4E5F67A8B9C0D1E2F3A4B5C6D7E8F9A-->  <DESCRIPTION><![CDATA[Download the generated label file after sending it to the printer.]]></DESCRIPTION>
-<!--D4E5F67A8B9C0D1E2F3A4B5C6D7E8F9A-->  <HELP><![CDATA[When checked, the generated label PDF will be downloaded to your browser in addition to being sent to the printer. If multiple records are selected, all labels are merged into a single PDF for download. Uncheck if you only want to send the label without downloading it. Default is checked.]]></HELP>
+<!--D4E5F67A8B9C0D1E2F3A4B5C6D7E8F9A-->  <DESCRIPTION><![CDATA[Whether to download the generated label file after printing.]]></DESCRIPTION>
+<!--D4E5F67A8B9C0D1E2F3A4B5C6D7E8F9A-->  <HELP><![CDATA[When checked, the label file is downloaded to the browser in addition to being sent to the printer. Uncheck to skip the download.]]></HELP>
 <!--D4E5F67A8B9C0D1E2F3A4B5C6D7E8F9A-->  <SEQNO><![CDATA[40]]></SEQNO>
 <!--D4E5F67A8B9C0D1E2F3A4B5C6D7E8F9A-->  <AD_REFERENCE_ID><![CDATA[20]]></AD_REFERENCE_ID>
 <!--D4E5F67A8B9C0D1E2F3A4B5C6D7E8F9A-->  <COLUMNNAME><![CDATA[downloadlabel]]></COLUMNNAME>
