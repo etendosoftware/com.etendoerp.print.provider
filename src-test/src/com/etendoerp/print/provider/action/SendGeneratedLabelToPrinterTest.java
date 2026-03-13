@@ -9,7 +9,7 @@
  * "AS IS" basis, WITHOUT WARRANTY OF ANY KIND, either express or
  * implied. See the License for the specific language governing rights
  * and limitations under the License.
- * All portions are Copyright © 2021–2025 FUTIT SERVICES, S.L
+ * All portions are Copyright © 2021–2026 FUTIT SERVICES, S.L
  * All Rights Reserved.
  * Contributor(s): Futit Services S.L.
  *************************************************************************
@@ -17,11 +17,22 @@
 package com.etendoerp.print.provider.action;
 
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.notNullValue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.nullable;
+
+import java.io.File;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.util.Collections;
+import java.util.List;
 
 import org.apache.commons.lang3.mutable.MutableBoolean;
 import org.codehaus.jettison.json.JSONArray;
@@ -30,8 +41,11 @@ import org.hibernate.criterion.Criterion;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.mockito.MockedStatic;
 import org.mockito.Mockito;
+import org.openbravo.base.structure.BaseOBObject;
+import org.openbravo.client.application.process.ResponseActionsBuilder;
 import org.openbravo.dal.core.OBContext;
 import org.openbravo.dal.service.OBCriteria;
 import org.openbravo.dal.service.OBDal;
@@ -62,6 +76,8 @@ class SendGeneratedLabelToPrinterTest {
   private static final String PRN_MISSING = "p-missing";
   private static final String ENTITY = "M_InOut";
   private static final String REC_1 = "rec-1";
+  private static final String REC_2 = "rec-2";
+  private static final String TRUE = "true";
 
   // Message templates for assertions
   private static final String MSG_MISSING_PARAM = "Missing parameter: %s";
@@ -70,6 +86,18 @@ class SendGeneratedLabelToPrinterTest {
   private static final String MSG_TABLE_NOT_FOUND_FMT = "Table %s not found";
   private static final String MSG_PROVIDER_ERROR_FMT = "Provider error: %s";
   private static final String MSG_ALL_FAILED = "All print jobs failed";
+  private static final String MSG_PRINT_JOB_SENT = "Print jobs sent: %s";
+  private static final String MSG_SOME_FAILED = "%s print jobs failed";
+  private static final String MSG_PRINT_FAILED_DOWNLOAD = "Print failed but download ready";
+  private static final String MSG_DOWNLOAD_FAILED = "Download failed";
+  private static final String MSG_DOWNLOAD_ONLY_SUCCESS = "Labels generated and ready for download";
+  private static final String MSG_ALL_GEN_FAILED = "All label generations failed";
+  private static final String MSG_SOME_GEN_FAILED = "%s label(s) failed to generate";
+  private static final String MSG_NO_JOBS = "There are no jobs to download or send to printers.";
+
+  // Temp directory for download-enabled tests
+  @TempDir
+  File tmpDir;
 
   // Static mocks for dependencies
   private MockedStatic<OBMessageUtils> sMsg;
@@ -86,7 +114,7 @@ class SendGeneratedLabelToPrinterTest {
   private TemplateLine tLine;
   private PrintProviderStrategy strategy;
 
-  // Instance of the action under test
+  // Instance of the action under test (spy for download tests)
   private SendGeneratedLabelToPrinter action;
 
   /**
@@ -102,6 +130,8 @@ class SendGeneratedLabelToPrinterTest {
     json.put(PrinterUtils.PRINTERS, PRN_OK);
     json.put(PrinterUtils.NUMBER_OF_COPIES, 1);
     json.put(PrinterUtils.RECORDS, new JSONArray().put(REC_1));
+    // Disable download by default; tests that need it override to "true"
+    json.put(PrinterUtils.DOWNLOAD_LABEL, "false");
     return json;
   }
 
@@ -139,6 +169,30 @@ class SendGeneratedLabelToPrinterTest {
 
     sMsgStatic.when(() -> OBMessageUtils.messageBD("ETPP_AllPrintJobsFailed"))
         .thenReturn(MSG_ALL_FAILED);
+
+    // Stubs for success, download, and partial-failure flows
+    sMsgStatic.when(() -> OBMessageUtils.getI18NMessage("ETPP_PrintJobSent"))
+        .thenReturn(MSG_PRINT_JOB_SENT);
+    sMsgStatic.when(() -> OBMessageUtils.getI18NMessage("ETPP_SomePrintJobsFailed"))
+        .thenReturn(MSG_SOME_FAILED);
+    sMsgStatic.when(() -> OBMessageUtils.getI18NMessage("ETPP_PrintFailedDownloadReady"))
+        .thenReturn(MSG_PRINT_FAILED_DOWNLOAD);
+    sMsgStatic.when(() -> OBMessageUtils.getI18NMessage("ETPP_DownloadFailed"))
+        .thenReturn(MSG_DOWNLOAD_FAILED);
+    sMsgStatic.when(() -> OBMessageUtils.messageBD("Success"))
+        .thenReturn("Success");
+    sMsgStatic.when(() -> OBMessageUtils.messageBD("Warning"))
+        .thenReturn("Warning");
+
+    // Stubs for download-only mode messages
+    sMsgStatic.when(() -> OBMessageUtils.getI18NMessage("ETPP_DownloadOnlySuccess"))
+        .thenReturn(MSG_DOWNLOAD_ONLY_SUCCESS);
+    sMsgStatic.when(() -> OBMessageUtils.getI18NMessage("ETPP_AllGenerationsFailed"))
+        .thenReturn(MSG_ALL_GEN_FAILED);
+    sMsgStatic.when(() -> OBMessageUtils.getI18NMessage("ETPP_SomeGenerationsFailed"))
+        .thenReturn(MSG_SOME_GEN_FAILED);
+    sMsgStatic.when(() -> OBMessageUtils.getI18NMessage("ETPP_NoJobsToDownloadOrSend"))
+        .thenReturn(MSG_NO_JOBS);
   }
 
   /**
@@ -157,8 +211,8 @@ class SendGeneratedLabelToPrinterTest {
    */
   @BeforeEach
   void setUp() {
-    // Create instance of the action to be tested
-    action = new SendGeneratedLabelToPrinter();
+    // Create spy of the action to allow overriding createResponseBuilder / mergeLabels
+    action = Mockito.spy(new SendGeneratedLabelToPrinter());
 
     // Initialize static mocks for dependencies
     sMsg = Mockito.mockStatic(OBMessageUtils.class);
@@ -170,6 +224,16 @@ class SendGeneratedLabelToPrinterTest {
     // Stub i18n and context methods for predictable test behavior
     stubI18N(sMsg);
     stubOBContext(sObc);
+
+    // ResponseActionsBuilder mock with fluent chaining
+    ResponseActionsBuilder responseBuilder = Mockito.mock(ResponseActionsBuilder.class);
+    Mockito.when(responseBuilder.showMsgInProcessView(
+            any(ResponseActionsBuilder.MessageType.class), anyString(), anyString()))
+        .thenReturn(responseBuilder);
+    Mockito.when(responseBuilder.addCustomResponseAction(anyString(), any(JSONObject.class)))
+        .thenReturn(responseBuilder);
+    Mockito.doReturn(responseBuilder).when(action).createResponseBuilder();
+    Mockito.doReturn(tmpDir.getAbsolutePath()).when(action).getReportingTempFolder();
 
     // Mock DAL and domain objects
     dal = Mockito.mock(OBDal.class);
@@ -199,6 +263,7 @@ class SendGeneratedLabelToPrinterTest {
     // Mock provider strategy resolution
     strategy = Mockito.mock(PrintProviderStrategy.class);
     sResolver.when(() -> ProviderStrategyResolver.resolveForProvider(provider)).thenReturn(strategy);
+    sResolver.when(ProviderStrategyResolver::resolveDefault).thenReturn(strategy);
   }
 
   /**
@@ -206,28 +271,69 @@ class SendGeneratedLabelToPrinterTest {
    */
   @AfterEach
   void tearDown() {
-    // Close all static mocks to release resources
-    sUtil.close();
-    sResolver.close();
-    sDal.close();
-    sObc.close();
-    sMsg.close();
+    // Close all static mocks to release resources (null-safe to prevent cascading)
+    safeClose(sUtil);
+    safeClose(sResolver);
+    safeClose(sDal);
+    safeClose(sObc);
+    safeClose(sMsg);
+  }
+
+  private static void safeClose(MockedStatic<?> mock) {
+    if (mock != null) {
+      try {
+        mock.close();
+      } catch (Exception ignored) {
+        // already closed or never opened
+      }
+    }
   }
 
   /**
-   * Verifies that the action throws an error if the provider parameter is missing.
-   * Ensures proper error handling for missing required parameters.
+   * Creates a temporary file in {@code tmpDir} that acts as a generated label.
+   */
+  private File createTempLabel(String name) throws IOException {
+    File f = new File(tmpDir, name + ".pdf");
+    Files.write(f.toPath(), "fake-pdf-content".getBytes(StandardCharsets.UTF_8));
+    return f;
+  }
+
+  /**
+   * When the provider parameter is absent, the action operates in download-only
+   * mode: generates labels using the default strategy and offers them for download.
    */
   @Test
-  void actionErrorMissingProviderParam() throws Exception {
-    // Remove provider parameter to simulate missing input
+  void actionDownloadOnlyWhenProviderMissing() throws Exception {
     JSONObject params = baseParams();
     params.remove(PrinterUtils.PROVIDER);
+    params.put(PrinterUtils.DOWNLOAD_LABEL, TRUE);
 
-    // Execute action and verify error result
+    File labelFile = createTempLabel("dl-only-no-prov");
+    Mockito.when(strategy.generateLabel(
+            eq(null), eq(table), eq(REC_1), eq(tLine), any(JSONObject.class)))
+        .thenReturn(labelFile);
+
     ActionResult res = action.action(params, new MutableBoolean(false));
-    assertThat(res.getType(), is(Result.Type.ERROR));
-    assertThat(res.getMessage(), is("Missing parameter: Provider"));
+
+    assertThat(res.getType(), is(Result.Type.SUCCESS));
+    assertThat(res.getMessage(), is(MSG_DOWNLOAD_ONLY_SUCCESS));
+    assertThat(res.getResponseActionsBuilder(), is(notNullValue()));
+  }
+
+  /**
+   * When neither provider nor download are enabled there is nothing to do,
+   * so the action returns WARNING with {@code ETPP_NoJobsToDownloadOrSend}.
+   */
+  @Test
+  void actionNoProviderNoDownloadReturnsWarning() throws Exception {
+    JSONObject params = baseParams();
+    params.remove(PrinterUtils.PROVIDER);
+    // download is already "false" from baseParams
+
+    ActionResult res = action.action(params, new MutableBoolean(false));
+
+    assertThat(res.getType(), is(Result.Type.WARNING));
+    assertThat(res.getMessage(), is(MSG_NO_JOBS));
   }
 
   /**
@@ -305,5 +411,494 @@ class SendGeneratedLabelToPrinterTest {
 
     assertThat(res.getType(), is(Result.Type.ERROR));
     assertThat(res.getMessage(), is(MSG_ALL_FAILED));
+  }
+
+  // ─── Happy-path tests ──────────────────────────────────────────────────
+
+  /**
+   * Single record printed successfully with download disabled.
+   */
+  @Test
+  void actionSuccessfulPrintSingleRecordNoDownload() throws Exception {
+    JSONObject params = baseParams();
+
+    File labelFile = createTempLabel("success-1");
+    Mockito.when(strategy.generateLabel(
+            eq(provider), eq(table), eq(REC_1), eq(tLine), any(JSONObject.class)))
+        .thenReturn(labelFile);
+    Mockito.when(strategy.sendToPrinter(
+            eq(provider), any(Printer.class), eq(1), any(File.class)))
+        .thenReturn("JOB-100");
+
+    ActionResult res = action.action(params, new MutableBoolean(false));
+
+    assertThat(res.getType(), is(Result.Type.SUCCESS));
+    assertThat(res.getMessage(), containsString("JOB-100"));
+  }
+
+  /**
+   * Multiple records printed successfully, message contains all job IDs.
+   */
+  @Test
+  void actionSuccessfulPrintMultipleRecordsNoDownload() throws Exception {
+    JSONObject params = baseParams();
+    params.put(PrinterUtils.RECORDS, new JSONArray().put(REC_1).put(REC_2));
+
+    File label1 = createTempLabel("multi-1");
+    File label2 = createTempLabel("multi-2");
+    Mockito.when(strategy.generateLabel(
+            eq(provider), eq(table), eq(REC_1), eq(tLine), any(JSONObject.class)))
+        .thenReturn(label1);
+    Mockito.when(strategy.generateLabel(
+            eq(provider), eq(table), eq(REC_2), eq(tLine), any(JSONObject.class)))
+        .thenReturn(label2);
+    Mockito.when(strategy.sendToPrinter(
+            eq(provider), any(Printer.class), eq(1), any(File.class)))
+        .thenReturn("JOB-A", "JOB-B");
+
+    ActionResult res = action.action(params, new MutableBoolean(false));
+
+    assertThat(res.getType(), is(Result.Type.SUCCESS));
+    assertThat(res.getMessage(), containsString("JOB-A"));
+    assertThat(res.getMessage(), containsString("JOB-B"));
+  }
+
+  /**
+   * Single record printed + download enabled. buildDownloadResponse is invoked
+   * and the result carries a {@link ResponseActionsBuilder}.
+   */
+  @Test
+  void actionSuccessfulPrintWithDownload() throws Exception {
+    JSONObject params = baseParams();
+    params.put(PrinterUtils.DOWNLOAD_LABEL, TRUE);
+
+    File labelFile = createTempLabel("dl-1");
+    Mockito.when(strategy.generateLabel(
+            eq(provider), eq(table), eq(REC_1), eq(tLine), any(JSONObject.class)))
+        .thenReturn(labelFile);
+    Mockito.when(strategy.sendToPrinter(
+            eq(provider), any(Printer.class), eq(1), any(File.class)))
+        .thenReturn("JOB-DL");
+
+    ActionResult res = action.action(params, new MutableBoolean(false));
+
+    assertThat(res.getType(), is(Result.Type.SUCCESS));
+    assertThat(res.getResponseActionsBuilder(), is(notNullValue()));
+  }
+
+  /**
+   * When {@code downloadlabel} is absent the default is {@code "Y"}, so
+   * download should still be triggered.
+   */
+  @Test
+  void actionDownloadDefaultIsEnabled() throws Exception {
+    JSONObject params = baseParams();
+    params.remove(PrinterUtils.DOWNLOAD_LABEL);
+
+    File labelFile = createTempLabel("default-dl");
+    Mockito.when(strategy.generateLabel(
+            eq(provider), eq(table), eq(REC_1), eq(tLine), any(JSONObject.class)))
+        .thenReturn(labelFile);
+    Mockito.when(strategy.sendToPrinter(
+            eq(provider), any(Printer.class), eq(1), any(File.class)))
+        .thenReturn("JOB-DEF");
+
+    ActionResult res = action.action(params, new MutableBoolean(false));
+
+    assertThat(res.getType(), is(Result.Type.SUCCESS));
+    assertThat(res.getResponseActionsBuilder(), is(notNullValue()));
+  }
+
+  // ─── All-failed tests ──────────────────────────────────────────────────
+
+  /**
+   * All records fail with download disabled → ERROR.
+   */
+  @Test
+  void actionAllFailedNoDownloadReturnsError() throws Exception {
+    JSONObject params = baseParams();
+
+    Mockito.when(strategy.generateLabel(
+            eq(provider), eq(table), anyString(), eq(tLine), any(JSONObject.class)))
+        .thenThrow(new RuntimeException("gen fail"));
+
+    ActionResult res = action.action(params, new MutableBoolean(false));
+
+    assertThat(res.getType(), is(Result.Type.ERROR));
+    assertThat(res.getMessage(), is(MSG_ALL_FAILED));
+  }
+
+  /**
+   * All records' print jobs fail but labels are generated, download=Y →
+   * WARNING with download response and {@code ETPP_PrintFailedDownloadReady}.
+   */
+  @Test
+  void actionAllFailedDownloadEnabledWithLabelsReturnsWarningWithDownload() throws Exception {
+    JSONObject params = baseParams();
+    params.put(PrinterUtils.DOWNLOAD_LABEL, TRUE);
+
+    File labelFile = createTempLabel("fail-dl-1");
+    Mockito.when(strategy.generateLabel(
+            eq(provider), eq(table), eq(REC_1), eq(tLine), any(JSONObject.class)))
+        .thenReturn(labelFile);
+    Mockito.when(strategy.sendToPrinter(
+            eq(provider), any(Printer.class), eq(1), any(File.class)))
+        .thenThrow(new RuntimeException("Printer offline"));
+
+    ActionResult res = action.action(params, new MutableBoolean(false));
+
+    assertThat(res.getType(), is(Result.Type.WARNING));
+    assertThat(res.getMessage(), is(MSG_PRINT_FAILED_DOWNLOAD));
+    assertThat(res.getResponseActionsBuilder(), is(notNullValue()));
+  }
+
+  /**
+   * All records fail, download=Y but generateLabel returns null (no labels
+   * to download) → ERROR without download.
+   */
+  @Test
+  void actionAllFailedDownloadEnabledNoLabelsReturnsError() throws Exception {
+    JSONObject params = baseParams();
+    params.put(PrinterUtils.DOWNLOAD_LABEL, TRUE);
+
+    Mockito.when(strategy.generateLabel(
+            eq(provider), eq(table), eq(REC_1), eq(tLine), any(JSONObject.class)))
+        .thenReturn(null);
+    Mockito.when(strategy.sendToPrinter(
+            eq(provider), any(Printer.class), eq(1), nullable(File.class)))
+        .thenThrow(new RuntimeException("No label"));
+
+    ActionResult res = action.action(params, new MutableBoolean(false));
+
+    assertThat(res.getType(), is(Result.Type.ERROR));
+    assertThat(res.getMessage(), is(MSG_ALL_FAILED));
+  }
+
+  // ─── Partial-failure tests ──────────────────────────────────────────────
+
+  /**
+   * Two records: first succeeds, second fails. Download disabled → WARNING.
+   */
+  @Test
+  void actionSomeFailedNoDownloadReturnsWarning() throws Exception {
+    JSONObject params = baseParams();
+    params.put(PrinterUtils.RECORDS, new JSONArray().put(REC_1).put(REC_2));
+
+    File label1 = createTempLabel("partial-1");
+    Mockito.when(strategy.generateLabel(
+            eq(provider), eq(table), eq(REC_1), eq(tLine), any(JSONObject.class)))
+        .thenReturn(label1);
+    Mockito.when(strategy.generateLabel(
+            eq(provider), eq(table), eq(REC_2), eq(tLine), any(JSONObject.class)))
+        .thenThrow(new RuntimeException("gen fail for rec-2"));
+    Mockito.when(strategy.sendToPrinter(
+            eq(provider), any(Printer.class), eq(1), any(File.class)))
+        .thenReturn("JOB-PARTIAL");
+
+    ActionResult res = action.action(params, new MutableBoolean(false));
+
+    assertThat(res.getType(), is(Result.Type.WARNING));
+    assertThat(res.getMessage(), containsString("1 print jobs failed"));
+  }
+
+  /**
+   * Two records: both labels generated, second sendToPrinter fails.
+   * Download=Y → WARNING with download.
+   */
+  @Test
+  void actionSomeFailedWithDownloadReturnsWarningWithDownload() throws Exception {
+    JSONObject params = baseParams();
+    params.put(PrinterUtils.DOWNLOAD_LABEL, TRUE);
+    params.put(PrinterUtils.RECORDS, new JSONArray().put(REC_1).put(REC_2));
+
+    File label1 = createTempLabel("part-dl-1");
+    File label2 = createTempLabel("part-dl-2");
+    Mockito.when(strategy.generateLabel(
+            eq(provider), eq(table), eq(REC_1), eq(tLine), any(JSONObject.class)))
+        .thenReturn(label1);
+    Mockito.when(strategy.generateLabel(
+            eq(provider), eq(table), eq(REC_2), eq(tLine), any(JSONObject.class)))
+        .thenReturn(label2);
+    Mockito.when(strategy.sendToPrinter(
+            eq(provider), any(Printer.class), eq(1), any(File.class)))
+        .thenReturn("JOB-OK")
+        .thenThrow(new RuntimeException("Printer jam"));
+
+    // Override mergeLabels to avoid iText real-PDF dependency
+    Mockito.doReturn(label1).when(action).mergeLabels(any(List.class));
+
+    ActionResult res = action.action(params, new MutableBoolean(false));
+
+    assertThat(res.getType(), is(Result.Type.WARNING));
+    assertThat(res.getMessage(), is(MSG_PRINT_FAILED_DOWNLOAD));
+    assertThat(res.getResponseActionsBuilder(), is(notNullValue()));
+  }
+
+  // ─── Outer exception catches ──────────────────────────────────────────
+
+  /**
+   * PrintProviderException thrown OUTSIDE the inner loop (e.g. strategy
+   * resolution) → outer catch → ERROR + rollback.
+   */
+  @Test
+  void actionPrintProviderExceptionOuterCatchRollsBack() throws Exception {
+    JSONObject params = baseParams();
+
+    sResolver.when(() -> ProviderStrategyResolver.resolveForProvider(provider))
+        .thenThrow(new PrintProviderException("strategy init failed"));
+
+    ActionResult res = action.action(params, new MutableBoolean(false));
+
+    assertThat(res.getType(), is(Result.Type.ERROR));
+    assertThat(res.getMessage(), containsString("strategy init failed"));
+    Mockito.verify(dal).rollbackAndClose();
+  }
+
+  /**
+   * Generic RuntimeException thrown outside the loop → outer catch → ERROR + rollback.
+   */
+  @Test
+  void actionGenericExceptionOuterCatchRollsBack() throws Exception {
+    JSONObject params = baseParams();
+
+    sResolver.when(() -> ProviderStrategyResolver.resolveForProvider(provider))
+        .thenThrow(new RuntimeException("unexpected error"));
+
+    ActionResult res = action.action(params, new MutableBoolean(false));
+
+    assertThat(res.getType(), is(Result.Type.ERROR));
+    assertThat(res.getMessage(), is("unexpected error"));
+    Mockito.verify(dal).rollbackAndClose();
+  }
+
+  // ─── Edge cases ──────────────────────────────────────────────────────
+
+  /**
+   * sendToPrinter returns blank → StringUtils.defaultIfBlank yields "-".
+   */
+  @Test
+  void actionSendToPrinterReturnsBlankUsesHyphen() throws Exception {
+    JSONObject params = baseParams();
+
+    File labelFile = createTempLabel("blank-job");
+    Mockito.when(strategy.generateLabel(
+            eq(provider), eq(table), eq(REC_1), eq(tLine), any(JSONObject.class)))
+        .thenReturn(labelFile);
+    Mockito.when(strategy.sendToPrinter(
+            eq(provider), any(Printer.class), eq(1), any(File.class)))
+        .thenReturn("");
+
+    ActionResult res = action.action(params, new MutableBoolean(false));
+
+    assertThat(res.getType(), is(Result.Type.SUCCESS));
+    assertThat(res.getMessage(), containsString("-"));
+  }
+
+  /**
+   * sendToPrinter returns null → StringUtils.defaultIfBlank yields "-".
+   */
+  @Test
+  void actionSendToPrinterReturnsNullUsesHyphen() throws Exception {
+    JSONObject params = baseParams();
+
+    File labelFile = createTempLabel("null-job");
+    Mockito.when(strategy.generateLabel(
+            eq(provider), eq(table), eq(REC_1), eq(tLine), any(JSONObject.class)))
+        .thenReturn(labelFile);
+    Mockito.when(strategy.sendToPrinter(
+            eq(provider), any(Printer.class), eq(1), any(File.class)))
+        .thenReturn(null);
+
+    ActionResult res = action.action(params, new MutableBoolean(false));
+
+    assertThat(res.getType(), is(Result.Type.SUCCESS));
+    assertThat(res.getMessage(), containsString("-"));
+  }
+
+  /**
+   * generateLabel returns null with download=Y → label is NOT retained,
+   * so no download even though it is enabled.
+   */
+  @Test
+  void actionLabelNullNotRetainedForDownload() throws Exception {
+    JSONObject params = baseParams();
+    params.put(PrinterUtils.DOWNLOAD_LABEL, TRUE);
+
+    Mockito.when(strategy.generateLabel(
+            eq(provider), eq(table), eq(REC_1), eq(tLine), any(JSONObject.class)))
+        .thenReturn(null);
+    Mockito.when(strategy.sendToPrinter(
+            eq(provider), any(Printer.class), eq(1), nullable(File.class)))
+        .thenReturn("JOB-NL");
+
+    ActionResult res = action.action(params, new MutableBoolean(false));
+
+    // No download because downloadableLabels is empty
+    assertThat(res.getType(), is(Result.Type.SUCCESS));
+    assertThat(res.getMessage(), containsString("JOB-NL"));
+  }
+
+  // ─── Missing parameter tests ──────────────────────────────────────────
+
+  /**
+   * Missing entityName parameter → ERROR.
+   */
+  @Test
+  void actionErrorMissingEntityNameParam() throws Exception {
+    JSONObject params = baseParams();
+    params.remove(PrinterUtils.ENTITY_NAME);
+
+    ActionResult res = action.action(params, new MutableBoolean(false));
+
+    assertThat(res.getType(), is(Result.Type.ERROR));
+    assertThat(res.getMessage(), containsString(PrinterUtils.ENTITY_NAME));
+  }
+
+  /**
+   * Missing records parameter → ERROR.
+   */
+  @Test
+  void actionErrorMissingRecordsParam() throws Exception {
+    JSONObject params = baseParams();
+    params.remove(PrinterUtils.RECORDS);
+
+    ActionResult res = action.action(params, new MutableBoolean(false));
+
+    assertThat(res.getType(), is(Result.Type.ERROR));
+    assertThat(res.getMessage(), containsString(PrinterUtils.RECORDS));
+  }
+
+  /**
+   * When provider is set but printers is absent, the action operates in
+   * download-only mode using the provider's strategy.
+   */
+  @Test
+  void actionDownloadOnlyWhenPrinterMissing() throws Exception {
+    JSONObject params = baseParams();
+    params.remove(PrinterUtils.PRINTERS);
+    params.put(PrinterUtils.DOWNLOAD_LABEL, TRUE);
+
+    File labelFile = createTempLabel("dl-only-no-prn");
+    Mockito.when(strategy.generateLabel(
+            eq(provider), eq(table), eq(REC_1), eq(tLine), any(JSONObject.class)))
+        .thenReturn(labelFile);
+
+    ActionResult res = action.action(params, new MutableBoolean(false));
+
+    assertThat(res.getType(), is(Result.Type.SUCCESS));
+    assertThat(res.getMessage(), is(MSG_DOWNLOAD_ONLY_SUCCESS));
+    assertThat(res.getResponseActionsBuilder(), is(notNullValue()));
+  }
+
+  /**
+   * Missing numberOfCopies parameter → ERROR.
+   */
+  @Test
+  void actionErrorMissingNumberOfCopiesParam() throws Exception {
+    JSONObject params = baseParams();
+    params.remove(PrinterUtils.NUMBER_OF_COPIES);
+
+    ActionResult res = action.action(params, new MutableBoolean(false));
+
+    assertThat(res.getType(), is(Result.Type.ERROR));
+    assertThat(res.getMessage(), containsString(PrinterUtils.NUMBER_OF_COPIES));
+  }
+
+  // ─── buildDownloadResponse error path ──────────────────────────────────
+
+  /**
+   * When mergeLabels throws inside buildDownloadResponse, the catch block
+   * returns WARNING with the original message + ETPP_DownloadFailed.
+   */
+  @Test
+  void actionDownloadBuildFailureReturnsWarningWithDownloadFailed() throws Exception {
+    JSONObject params = baseParams();
+    params.put(PrinterUtils.DOWNLOAD_LABEL, TRUE);
+
+    File labelFile = createTempLabel("build-fail");
+    Mockito.when(strategy.generateLabel(
+            eq(provider), eq(table), eq(REC_1), eq(tLine), any(JSONObject.class)))
+        .thenReturn(labelFile);
+    Mockito.when(strategy.sendToPrinter(
+            eq(provider), any(Printer.class), eq(1), any(File.class)))
+        .thenReturn("JOB-BF");
+
+    // Force mergeLabels to throw so buildDownloadResponse enters the catch
+    Mockito.doThrow(new IOException("merge crash"))
+        .when(action).mergeLabels(any(List.class));
+
+    ActionResult res = action.action(params, new MutableBoolean(false));
+
+    assertThat(res.getType(), is(Result.Type.WARNING));
+    assertThat(res.getMessage(), containsString(MSG_DOWNLOAD_FAILED));
+  }
+
+  // ─── Download-only mode tests ──────────────────────────────────────────
+
+  /**
+   * Download-only mode (no provider): all label generations fail → ERROR.
+   */
+  @Test
+  void actionDownloadOnlyAllGenerationsFailed() throws Exception {
+    JSONObject params = baseParams();
+    params.remove(PrinterUtils.PROVIDER);
+    params.put(PrinterUtils.DOWNLOAD_LABEL, TRUE);
+
+    Mockito.when(strategy.generateLabel(
+            eq(null), eq(table), eq(REC_1), eq(tLine), any(JSONObject.class)))
+        .thenThrow(new RuntimeException("gen fail"));
+
+    ActionResult res = action.action(params, new MutableBoolean(false));
+
+    assertThat(res.getType(), is(Result.Type.ERROR));
+    assertThat(res.getMessage(), is(MSG_ALL_GEN_FAILED));
+  }
+
+  /**
+   * Download-only mode (no provider): two records, second generation fails →
+   * WARNING with partial download.
+   */
+  @Test
+  void actionDownloadOnlySomeGenerationsFailed() throws Exception {
+    JSONObject params = baseParams();
+    params.remove(PrinterUtils.PROVIDER);
+    params.put(PrinterUtils.DOWNLOAD_LABEL, TRUE);
+    params.put(PrinterUtils.RECORDS, new JSONArray().put(REC_1).put(REC_2));
+
+    File label1 = createTempLabel("dl-partial-1");
+    Mockito.when(strategy.generateLabel(
+            eq(null), eq(table), eq(REC_1), eq(tLine), any(JSONObject.class)))
+        .thenReturn(label1);
+    Mockito.when(strategy.generateLabel(
+            eq(null), eq(table), eq(REC_2), eq(tLine), any(JSONObject.class)))
+        .thenThrow(new RuntimeException("gen fail for rec-2"));
+
+    ActionResult res = action.action(params, new MutableBoolean(false));
+
+    assertThat(res.getType(), is(Result.Type.WARNING));
+    assertThat(res.getMessage(), containsString("1 label(s) failed"));
+    assertThat(res.getResponseActionsBuilder(), is(notNullValue()));
+  }
+
+  // ─── mergeLabels direct test ──────────────────────────────────────────
+
+  /**
+   * When mergeLabels receives a single-element list it returns that same file.
+   */
+  @Test
+  void mergeLabelsReturnsFileWhenSingle() throws IOException {
+    File single = createTempLabel("single");
+    File result = action.mergeLabels(Collections.singletonList(single));
+    assertThat(result, is(single));
+  }
+
+  // ─── getInputClass ────────────────────────────────────────────────────
+
+  /**
+   * Verifies that getInputClass returns BaseOBObject.
+   */
+  @Test
+  void getInputClassReturnsBaseOBObject() {
+    assertThat(action.getInputClass(), equalTo(BaseOBObject.class));
   }
 }

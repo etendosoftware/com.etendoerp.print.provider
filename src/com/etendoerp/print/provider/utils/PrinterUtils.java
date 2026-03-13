@@ -70,6 +70,7 @@ public class PrinterUtils {
   public static final String PRINTERS_URL = "printersurl";
   public static final String API_KEY = "apikey";
   public static final String PRINTJOB_URL = "printjoburl";
+  public static final String DOWNLOAD_LABEL = "downloadlabel";
 
   private static final String TOKEN_BASEDESIGN = "@basedesign@";
 
