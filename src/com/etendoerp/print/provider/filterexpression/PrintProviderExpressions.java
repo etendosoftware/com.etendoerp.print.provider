@@ -21,8 +21,7 @@ import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.hibernate.criterion.Order;
-import org.hibernate.criterion.Restrictions;
+import org.openbravo.dal.service.Restrictions;
 import org.openbravo.client.application.FilterExpression;
 import org.openbravo.dal.core.OBContext;
 import org.openbravo.dal.service.OBCriteria;
@@ -100,7 +99,7 @@ public class PrintProviderExpressions implements FilterExpression {
    */
   protected String getDefaultProviderForPrintJob() {
     OBCriteria<Provider> providerOBCriteria = OBDal.getInstance().createCriteria(Provider.class);
-    providerOBCriteria.addOrder(Order.asc(Provider.PROPERTY_NAME));
+    providerOBCriteria.addOrderBy(Provider.PROPERTY_NAME, true);
     providerOBCriteria.setMaxResults(1);
 
     Provider provider = (Provider) providerOBCriteria.uniqueResult();
@@ -129,8 +128,8 @@ public class PrintProviderExpressions implements FilterExpression {
 
     OBCriteria<Printer> printerOBCriteria = OBDal.getInstance().createCriteria(Printer.class);
     printerOBCriteria.add(Restrictions.eq(Printer.PROPERTY_PROVIDER, provider));
-    printerOBCriteria.addOrder(Order.desc(Printer.PROPERTY_DEFAULT));
-    printerOBCriteria.addOrder(Order.asc(Provider.PROPERTY_NAME));
+    printerOBCriteria.addOrderBy(Printer.PROPERTY_DEFAULT, false);
+    printerOBCriteria.addOrderBy(Provider.PROPERTY_NAME, true);
     printerOBCriteria.setMaxResults(1);
 
     Printer printerResult = (Printer) printerOBCriteria.uniqueResult();

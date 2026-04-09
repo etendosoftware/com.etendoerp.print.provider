@@ -35,9 +35,9 @@ import java.io.File;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Modifier;
 
-import javax.servlet.ServletContext;
+import jakarta.servlet.ServletContext;
 
-import org.hibernate.criterion.Criterion;
+import org.openbravo.dal.service.Restriction;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

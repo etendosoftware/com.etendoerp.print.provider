@@ -33,7 +33,6 @@ import static org.mockito.Mockito.when;
 import java.util.HashMap;
 import java.util.Map;
 
-import org.hibernate.criterion.Order;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -177,7 +176,7 @@ class PrintProviderExpressionsTest {
     assertEquals("", hook.getDefaultProviderForPrintJob());
 
     verify(providerCriteria).setMaxResults(1);
-    verify(providerCriteria, atLeastOnce()).addOrder(any(Order.class));
+    verify(providerCriteria, atLeastOnce()).addOrderBy(any(String.class), org.mockito.ArgumentMatchers.anyBoolean());
   }
 
   /**
@@ -197,7 +196,7 @@ class PrintProviderExpressionsTest {
     assertEquals(PROV_1, result);
 
     verify(providerCriteria).setMaxResults(1);
-    verify(providerCriteria, atLeastOnce()).addOrder(any(Order.class));
+    verify(providerCriteria, atLeastOnce()).addOrderBy(any(String.class), org.mockito.ArgumentMatchers.anyBoolean());
   }
 
   /**
@@ -232,7 +231,7 @@ class PrintProviderExpressionsTest {
 
     verify(printerCriteria).setMaxResults(1);
     verify(printerCriteria, atLeast(1)).add(any());
-    verify(printerCriteria, atLeast(1)).addOrder(any(Order.class));
+    verify(printerCriteria, atLeast(1)).addOrderBy(any(String.class), org.mockito.ArgumentMatchers.anyBoolean());
   }
 
   /**
@@ -255,6 +254,6 @@ class PrintProviderExpressionsTest {
 
     verify(printerCriteria).setMaxResults(1);
     verify(printerCriteria, atLeast(1)).add(any());
-    verify(printerCriteria, atLeast(1)).addOrder(any(Order.class));
+    verify(printerCriteria, atLeast(1)).addOrderBy(any(String.class), org.mockito.ArgumentMatchers.anyBoolean());
   }
 }
