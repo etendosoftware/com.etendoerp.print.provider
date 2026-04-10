@@ -18,13 +18,12 @@ package com.etendoerp.print.provider.utils;
 
 import java.io.File;
 
-import javax.servlet.ServletContext;
+import jakarta.servlet.ServletContext;
 
 import org.apache.commons.lang3.StringUtils;
 import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONObject;
-import org.hibernate.criterion.Order;
-import org.hibernate.criterion.Restrictions;
+import org.openbravo.dal.service.Restrictions;
 import org.openbravo.base.exception.OBException;
 import org.openbravo.dal.core.DalContextListener;
 import org.openbravo.dal.service.OBCriteria;
@@ -156,8 +155,8 @@ public class PrinterUtils {
     // Pick best TemplateLine (default desc, lineNo asc)
     OBCriteria<TemplateLine> templateLineOBCriteria = OBDal.getInstance().createCriteria(TemplateLine.class);
     templateLineOBCriteria.add(Restrictions.eq(TemplateLine.PROPERTY_TEMPLATE, template));
-    templateLineOBCriteria.addOrder(Order.desc(TemplateLine.PROPERTY_DEFAULT));
-    templateLineOBCriteria.addOrder(Order.asc(TemplateLine.PROPERTY_LINENO));
+    templateLineOBCriteria.addOrderBy(TemplateLine.PROPERTY_DEFAULT, false);
+    templateLineOBCriteria.addOrderBy(TemplateLine.PROPERTY_LINENO, true);
     templateLineOBCriteria.setMaxResults(1);
     return (TemplateLine) templateLineOBCriteria.uniqueResult();
   }
@@ -184,7 +183,7 @@ public class PrinterUtils {
 
     OBCriteria<ProviderParam> providerParamOBCriteria = OBDal.getInstance().createCriteria(ProviderParam.class);
     providerParamOBCriteria.add(Restrictions.eq(ProviderParam.PROPERTY_PROVIDER, provider));
-    providerParamOBCriteria.add(Restrictions.eq(ProviderParam.PROPERTY_SEARCHKEY, paramKey).ignoreCase());
+    providerParamOBCriteria.add(Restrictions.ilike(ProviderParam.PROPERTY_SEARCHKEY, paramKey));
     providerParamOBCriteria.setMaxResults(1);
 
     ProviderParam providerParam = (ProviderParam) providerParamOBCriteria.uniqueResult();
