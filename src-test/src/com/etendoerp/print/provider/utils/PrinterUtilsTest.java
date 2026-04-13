@@ -187,7 +187,7 @@ class PrinterUtilsTest {
       @SuppressWarnings("unchecked") OBCriteria<ProviderParam> criteria = mock(OBCriteria.class);
       when(obDal.createCriteria(ProviderParam.class)).thenReturn(criteria);
 
-      when(criteria.add(any(Criterion.class))).thenReturn(criteria);
+      when(criteria.add(any(Restriction.class))).thenReturn(criteria);
       when(criteria.uniqueResult()).thenReturn(providerParam);
 
       ProviderParam result = PrinterUtils.getRequiredParam(provider, API_KEY);
@@ -210,7 +210,7 @@ class PrinterUtilsTest {
       @SuppressWarnings("unchecked") OBCriteria<ProviderParam> criteria = mock(OBCriteria.class);
       when(obDal.createCriteria(ProviderParam.class)).thenReturn(criteria);
 
-      when(criteria.add(any(Criterion.class))).thenReturn(criteria);
+      when(criteria.add(any(Restriction.class))).thenReturn(criteria);
       when(criteria.uniqueResult()).thenReturn(null);
 
       OBException ex = assertThrows(OBException.class, () -> PrinterUtils.getRequiredParam(provider, PRINTERS_URL));

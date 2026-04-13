@@ -250,7 +250,7 @@ class SendGeneratedLabelToPrinterTest {
     OBCriteria<Table> tmpCrit = Mockito.mock(OBCriteria.class);
     tableCrit = tmpCrit;
     Mockito.when(dal.createCriteria(Table.class)).thenReturn(tableCrit);
-    Mockito.when(tableCrit.add(any(Criterion.class))).thenReturn(tableCrit);
+    Mockito.when(tableCrit.add(any(Restriction.class))).thenReturn(tableCrit);
     Mockito.when(tableCrit.setMaxResults(anyInt())).thenReturn(tableCrit);
 
     table = Mockito.mock(Table.class);
