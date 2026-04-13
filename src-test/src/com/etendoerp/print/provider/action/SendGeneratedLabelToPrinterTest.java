@@ -37,7 +37,7 @@ import java.util.List;
 import org.apache.commons.lang3.mutable.MutableBoolean;
 import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONObject;
-import org.hibernate.criterion.Criterion;
+import org.openbravo.dal.service.Restriction;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -250,7 +250,7 @@ class SendGeneratedLabelToPrinterTest {
     OBCriteria<Table> tmpCrit = Mockito.mock(OBCriteria.class);
     tableCrit = tmpCrit;
     Mockito.when(dal.createCriteria(Table.class)).thenReturn(tableCrit);
-    Mockito.when(tableCrit.add(any(Criterion.class))).thenReturn(tableCrit);
+    Mockito.when(tableCrit.add(any(Restriction.class))).thenReturn(tableCrit);
     Mockito.when(tableCrit.setMaxResults(anyInt())).thenReturn(tableCrit);
 
     table = Mockito.mock(Table.class);
