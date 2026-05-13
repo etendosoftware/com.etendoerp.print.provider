@@ -83,7 +83,7 @@ class PrinterUtilsTableTest {
       obDalStatic.when(OBDal::getInstance).thenReturn(obDal);
       @SuppressWarnings("unchecked") OBCriteria<Table> criteria = mock(OBCriteria.class);
       when(obDal.createCriteria(Table.class)).thenReturn(criteria);
-      when(criteria.add(any(org.hibernate.criterion.Criterion.class))).thenReturn(criteria);
+      when(criteria.add(any(org.openbravo.dal.service.Restriction.class))).thenReturn(criteria);
       when(criteria.uniqueResult()).thenReturn(table);
       assertSame(table, PrinterUtils.requireTableByName(entityName));
     }
@@ -101,7 +101,7 @@ class PrinterUtilsTableTest {
       obDalStatic.when(OBDal::getInstance).thenReturn(obDal);
       @SuppressWarnings("unchecked") OBCriteria<Table> criteria = mock(OBCriteria.class);
       when(obDal.createCriteria(Table.class)).thenReturn(criteria);
-      when(criteria.add(any(org.hibernate.criterion.Criterion.class))).thenReturn(criteria);
+      when(criteria.add(any(org.openbravo.dal.service.Restriction.class))).thenReturn(criteria);
       when(criteria.uniqueResult()).thenReturn(null);
       OBException ex = assertThrows(OBException.class, () -> PrinterUtils.requireTableByName(entityName));
       assertTrue(ex.getMessage().contains(entityName));
@@ -121,7 +121,7 @@ class PrinterUtilsTableTest {
       obDalStatic.when(OBDal::getInstance).thenReturn(obDal);
       @SuppressWarnings("unchecked") OBCriteria<Template> templateCrit = mock(OBCriteria.class);
       when(obDal.createCriteria(Template.class)).thenReturn(templateCrit);
-      when(templateCrit.add(any(org.hibernate.criterion.Criterion.class))).thenReturn(templateCrit);
+      when(templateCrit.add(any(org.openbravo.dal.service.Restriction.class))).thenReturn(templateCrit);
       when(templateCrit.uniqueResult()).thenReturn(null);
       OBException ex = assertThrows(OBException.class, () -> PrinterUtils.resolveTemplateLineFor(table));
       assertTrue(ex.getMessage().contains("Order"));
@@ -162,13 +162,12 @@ class PrinterUtilsTableTest {
     obDalStatic.when(OBDal::getInstance).thenReturn(obDal);
     @SuppressWarnings("unchecked") OBCriteria<Template> templateCrit = mock(OBCriteria.class);
     when(obDal.createCriteria(Template.class)).thenReturn(templateCrit);
-    when(templateCrit.add(any(org.hibernate.criterion.Criterion.class))).thenReturn(templateCrit);
+    when(templateCrit.add(any(org.openbravo.dal.service.Restriction.class))).thenReturn(templateCrit);
     when(templateCrit.setMaxResults(org.mockito.ArgumentMatchers.anyInt())).thenReturn(templateCrit);
     when(templateCrit.uniqueResult()).thenReturn(template);
     @SuppressWarnings("unchecked") OBCriteria<TemplateLine> lineCrit = mock(OBCriteria.class);
     when(obDal.createCriteria(TemplateLine.class)).thenReturn(lineCrit);
-    when(lineCrit.add(any(org.hibernate.criterion.Criterion.class))).thenReturn(lineCrit);
-    when(lineCrit.addOrder(any(org.hibernate.criterion.Order.class))).thenReturn(lineCrit);
+    when(lineCrit.add(any(org.openbravo.dal.service.Restriction.class))).thenReturn(lineCrit);
     when(lineCrit.setMaxResults(org.mockito.ArgumentMatchers.anyInt())).thenReturn(lineCrit);
     when(lineCrit.uniqueResult()).thenReturn(lineToReturn);
     return obDalStatic;

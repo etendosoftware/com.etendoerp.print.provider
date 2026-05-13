@@ -28,7 +28,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import javax.enterprise.inject.Instance;
+import jakarta.enterprise.inject.Instance;
 
 import org.codehaus.jettison.json.JSONObject;
 import org.junit.jupiter.api.BeforeEach;

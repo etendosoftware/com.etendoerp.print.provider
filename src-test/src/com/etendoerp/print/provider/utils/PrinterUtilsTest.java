@@ -35,9 +35,9 @@ import java.io.File;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Modifier;
 
-import javax.servlet.ServletContext;
+import jakarta.servlet.ServletContext;
 
-import org.hibernate.criterion.Criterion;
+import org.openbravo.dal.service.Restriction;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -187,7 +187,7 @@ class PrinterUtilsTest {
       @SuppressWarnings("unchecked") OBCriteria<ProviderParam> criteria = mock(OBCriteria.class);
       when(obDal.createCriteria(ProviderParam.class)).thenReturn(criteria);
 
-      when(criteria.add(any(Criterion.class))).thenReturn(criteria);
+      when(criteria.add(any(Restriction.class))).thenReturn(criteria);
       when(criteria.uniqueResult()).thenReturn(providerParam);
 
       ProviderParam result = PrinterUtils.getRequiredParam(provider, API_KEY);
@@ -210,7 +210,7 @@ class PrinterUtilsTest {
       @SuppressWarnings("unchecked") OBCriteria<ProviderParam> criteria = mock(OBCriteria.class);
       when(obDal.createCriteria(ProviderParam.class)).thenReturn(criteria);
 
-      when(criteria.add(any(Criterion.class))).thenReturn(criteria);
+      when(criteria.add(any(Restriction.class))).thenReturn(criteria);
       when(criteria.uniqueResult()).thenReturn(null);
 
       OBException ex = assertThrows(OBException.class, () -> PrinterUtils.getRequiredParam(provider, PRINTERS_URL));
